@@ -65,42 +65,10 @@ class AudioRecorder(
                 return false
             }
 
-            val sessionId = record.audioSessionId
-            if (AcousticEchoCanceler.isAvailable()) {
-                try {
-                    echoCanceler = AcousticEchoCanceler.create(sessionId)?.apply {
-                        enabled = true
-                    }
-                    Log.i(TAG, "Hardware AcousticEchoCanceler enabled on session $sessionId")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to enable AcousticEchoCanceler: ${e.message}")
-                }
-            }
-
-            if (NoiseSuppressor.isAvailable()) {
-                try {
-                    val filterEnabled = try {
-                        com.jarvis.assistant.JarvisApp.instance.preferences.isNoiseFilterEnabled
-                    } catch (_: Throwable) { true }
-                    noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply {
-                        enabled = filterEnabled
-                    }
-                    Log.i(TAG, "Hardware NoiseSuppressor enabled=$filterEnabled on session $sessionId")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to enable NoiseSuppressor: ${e.message}")
-                }
-            }
-
-            if (AutomaticGainControl.isAvailable()) {
-                try {
-                    automaticGainControl = AutomaticGainControl.create(sessionId)?.apply {
-                        enabled = true
-                    }
-                    Log.i(TAG, "Hardware AutomaticGainControl enabled on session $sessionId")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to enable AutomaticGainControl: ${e.message}")
-                }
-            }
+            val filterEnabled = try {
+                com.jarvis.assistant.JarvisApp.instance.preferences.isNoiseFilterEnabled
+            } catch (_: Throwable) { true }
+            attachAudioEffects(record.audioSessionId, filterEnabled)
 
             record.startRecording()
             audioRecord = record
@@ -126,6 +94,9 @@ class AudioRecorder(
                                 } else {
                                     onAudioChunk(ByteArray(0), 0f, AudioFrequencyData())
                                 }
+                            } else if (readBytes == 0) {
+                                // A blocking read should not return 0, but never busy-spin if it does.
+                                delay(10)
                             } else if (readBytes < 0) {
                                 consecutiveErrors++
                                 Log.w(TAG, "AudioRecord read error code: $readBytes (error count: $consecutiveErrors)")
@@ -136,8 +107,10 @@ class AudioRecorder(
                                 }
                             }
                         } catch (e: Exception) {
+                            consecutiveErrors++
                             Log.e(TAG, "Exception during AudioRecord read loop: ${e.message}", e)
                             delay(50)
+                            if (consecutiveErrors > 10 && isRecording.get()) break
                         }
                     }
 
@@ -145,8 +118,10 @@ class AudioRecorder(
                     if (isActive && isRecording.get()) {
                         delay(400)
                         try {
+                            audioRecord = null
                             currentRecord?.release()
                         } catch (_: Exception) {}
+                        releaseAudioEffects()
                         try {
                             val newRecord = AudioRecord(
                                 MediaRecorder.AudioSource.VOICE_COMMUNICATION,
@@ -156,6 +131,13 @@ class AudioRecorder(
                                 bufferSize
                             )
                             if (newRecord.state == AudioRecord.STATE_INITIALIZED) {
+                                // Effects are bound to the old audio session; re-attach them to
+                                // the new record, otherwise AEC/NS/AGC silently disappear after
+                                // the first recovery (echo + false barge-ins return).
+                                val filterEnabled = try {
+                                    com.jarvis.assistant.JarvisApp.instance.preferences.isNoiseFilterEnabled
+                                } catch (_: Throwable) { true }
+                                attachAudioEffects(newRecord.audioSessionId, filterEnabled)
                                 newRecord.startRecording()
                                 currentRecord = newRecord
                                 audioRecord = newRecord
@@ -176,6 +158,53 @@ class AudioRecorder(
             Log.e(TAG, "Error starting AudioRecord: ${e.message}", e)
             false
         }
+    }
+
+    /**
+     * Binds the platform DSP chain to one AudioRecord session. Called both on the first start
+     * and after every microphone auto-recovery, because effects do not survive a new session.
+     */
+    private fun attachAudioEffects(sessionId: Int, filterEnabled: Boolean) {
+        releaseAudioEffects()
+        if (AcousticEchoCanceler.isAvailable()) {
+            try {
+                echoCanceler = AcousticEchoCanceler.create(sessionId)?.apply { enabled = true }
+                Log.i(TAG, "Hardware AcousticEchoCanceler enabled on session $sessionId")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to enable AcousticEchoCanceler: ${e.message}")
+            }
+        }
+        if (NoiseSuppressor.isAvailable()) {
+            try {
+                noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply { enabled = filterEnabled }
+                Log.i(TAG, "Hardware NoiseSuppressor enabled=$filterEnabled on session $sessionId")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to enable NoiseSuppressor: ${e.message}")
+            }
+        }
+        if (AutomaticGainControl.isAvailable()) {
+            try {
+                automaticGainControl = AutomaticGainControl.create(sessionId)?.apply { enabled = true }
+                Log.i(TAG, "Hardware AutomaticGainControl enabled on session $sessionId")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to enable AutomaticGainControl: ${e.message}")
+            }
+        }
+    }
+
+    private fun releaseAudioEffects() {
+        runCatching { echoCanceler?.release() }.onFailure {
+            Log.w(TAG, "Error releasing AcousticEchoCanceler: ${it.message}")
+        }
+        runCatching { noiseSuppressor?.release() }.onFailure {
+            Log.w(TAG, "Error releasing NoiseSuppressor: ${it.message}")
+        }
+        runCatching { automaticGainControl?.release() }.onFailure {
+            Log.w(TAG, "Error releasing AutomaticGainControl: ${it.message}")
+        }
+        echoCanceler = null
+        noiseSuppressor = null
+        automaticGainControl = null
     }
 
     fun stop() {
@@ -202,15 +231,9 @@ class AudioRecorder(
         job?.cancel()
 
         try {
-            echoCanceler?.release()
-            noiseSuppressor?.release()
-            automaticGainControl?.release()
+            releaseAudioEffects()
         } catch (e: Exception) {
             Log.e(TAG, "Error releasing audio effects: ${e.message}")
-        } finally {
-            echoCanceler = null
-            noiseSuppressor = null
-            automaticGainControl = null
         }
 
         try {

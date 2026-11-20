@@ -344,6 +344,9 @@ class JarvisConversationService : Service() {
     private var isCurrentTurnOwnerVoiceVerified = false
     @Volatile
     private var ownerVerificationInconclusive = false
+    /** True only when the wake utterance was positively matched to the enrolled owner. */
+    @Volatile
+    private var lastWakeOwnerVerified = false
     // NOTE: The 120 s owner-verification lease anchored on this timestamp (see the
     // `120_000L` checks below) was reintroduced by PR #12 despite a separate product
     // decision to remove it. This is intentionally left exactly as PR #14 shipped it;
@@ -1193,10 +1196,15 @@ class JarvisConversationService : Service() {
         lastResponseTimedOut = false
         val now = System.currentTimeMillis()
         lastUserSpeechDetectedTime = now
-        lastOwnerVerifiedTimestamp = now
-        val wakeVerified = wakeTriggered && preferences.isOwnerVoiceEnabled && preferences.hasOwnerVoiceProfile()
-        isCurrentTurnOwnerVoiceVerified = wakeVerified || !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()
-        voiceGateOpen = wakeVerified || !ownerVerificationRequired()
+        val ownerGateRequired = preferences.isOwnerVoiceEnabled && preferences.hasOwnerVoiceProfile()
+        // Only a positively speaker-verified wake earns the owner lease. Previously every
+        // session (even a typed/non-owner wake) stamped `now` here, which silently opened the
+        // 120 s lease for anybody. Unenrolled users stay fail-open by design.
+        val wakeVerified = wakeTriggered && ownerGateRequired && lastWakeOwnerVerified
+        lastOwnerVerifiedTimestamp = if (!ownerGateRequired || wakeVerified) now else 0L
+        lastWakeOwnerVerified = false
+        isCurrentTurnOwnerVoiceVerified = wakeVerified || !ownerGateRequired
+        voiceGateOpen = wakeVerified || !ownerGateRequired
         synchronized(voiceGateBuffer) { voiceGateBuffer.clear() }
         ownerVerificationInconclusive = false
         pendingToolCalls.clear()
@@ -4278,33 +4286,63 @@ class JarvisConversationService : Service() {
         cancelStandbyIdleRelease()
 
         // Stage 2 — verify the wake utterance itself before activating. The detector only
-        // says "someone said the wake word"; this check says "it was the owner". On a
-        // mismatch (or when verification is on but nobody enrolled) Jarvis never activates
-        // and no audio is forwarded to Gemini.
+        // says "someone said the wake word"; this check says "it was the owner". A definite
+        // mismatch stops activation. If verification cannot be performed (no profile, model
+        // still warming up, or too little audio) we fail OPEN and let the streaming gate
+        // verify the actual command audio instead of killing the wake word.
         if (preferences.isOwnerVoiceEnabled) {
-            if (!preferences.hasOwnerVoiceProfile()) {
-                Log.w("JarvisService", "Wake heard but no owner voice profile is enrolled; prompting to enroll.")
-                announceOwnerEnrollmentNeeded()
-                return
-            }
             val pcm = wakeEngine?.recentPcm()
-            if (pcm == null || pcm.isEmpty()) {
-                Log.w("JarvisService", "Wake rejected: no wake-utterance audio available for verification.")
-                return
+            val hasAudio = pcm != null && pcm.isNotEmpty()
+            val match = if (hasAudio) {
+                com.jarvis.assistant.audio.OwnerVoiceManager.verifySpeakerAudio(pcm!!, preferences)
+            } else {
+                null
             }
-            val match = com.jarvis.assistant.audio.OwnerVoiceManager.verifySpeakerAudio(pcm, preferences)
-            if (!match.isMatch) {
+            val decision = com.jarvis.assistant.audio.WakeActivationPolicy.decide(
+                ownerVerificationEnabled = true,
+                hasProfile = preferences.hasOwnerVoiceProfile(),
+                hasAudio = hasAudio,
+                extractedVector = match?.hasExtractedVector == true,
+                isMatch = match?.isMatch == true
+            )
+            if (decision.promptEnrollment &&
+                com.jarvis.assistant.audio.WakeActivationPolicy.shouldPromptEnrollment(
+                    preferences.voiceEnrollPromptAt,
+                    now
+                )
+            ) {
+                preferences.voiceEnrollPromptAt = now
+                Log.i("JarvisService", "Wake heard but no owner profile; activating and prompting enrollment.")
+                announceOwnerEnrollmentNeeded()
+            }
+            if (!decision.activate) {
                 Log.w(
                     "JarvisService",
-                    "Wake rejected: speaker is not the owner (dist=${match.distance}, " +
-                        "hasVector=${match.hasExtractedVector}, thr=${match.threshold}). Ignored."
+                    "Wake rejected: speaker is not the owner (dist=${match?.distance}, " +
+                        "hasVector=${match?.hasExtractedVector}, thr=${match?.threshold}). Ignored."
                 )
                 return
             }
-            lastOwnerVerifiedTimestamp = now
-            isCurrentTurnOwnerVoiceVerified = true
-            ownerVerificationInconclusive = false
-            Log.i("JarvisService", "Wake verified: owner confirmed (dist=${match.distance}, sim=${match.similarityPercent}%).")
+            if (decision.verifiedOwner) {
+                lastOwnerVerifiedTimestamp = now
+                isCurrentTurnOwnerVoiceVerified = true
+                ownerVerificationInconclusive = false
+                lastWakeOwnerVerified = true
+                Log.i(
+                    "JarvisService",
+                    "Wake verified: owner confirmed (dist=${match?.distance}, sim=${match?.similarityPercent}%)."
+                )
+            } else {
+                // Fail-open: let the per-utterance streaming gate decide on the command audio.
+                lastWakeOwnerVerified = false
+                Log.i(
+                    "JarvisService",
+                    "Wake verification inconclusive (hasAudio=$hasAudio, " +
+                        "hasVector=${match?.hasExtractedVector}); continuing with command-audio verification."
+                )
+            }
+        } else {
+            lastWakeOwnerVerified = false
         }
 
         // Verification is heavy; standby may have been left underneath us. Bail out quietly so a

@@ -29,6 +29,10 @@ object OwnerVoiceManager {
     @Volatile
     private var voiceprintPath: String? = null
 
+    /** Back-off so a broken/missing model is not re-initialised on every wake attempt. */
+    @Volatile
+    private var voiceprintFailedAt = 0L
+
     /**
      * Lazily builds (and caches) the on-device sherpa-onnx speaker embedding extractor.
      * Returns null until the speaker model has been downloaded by [WakeModelDownloader].
@@ -44,6 +48,7 @@ object OwnerVoiceManager {
         val path = modelFile.absolutePath
         val current = voiceprint
         if (current != null && voiceprintPath == path) return current
+        if (current == null && System.currentTimeMillis() - voiceprintFailedAt < 60_000L) return null
         return synchronized(this) {
             if (voiceprint == null || voiceprintPath != path) {
                 voiceprint?.close()
@@ -53,8 +58,10 @@ object OwnerVoiceManager {
                 if (created.isReady) {
                     voiceprint = created
                     voiceprintPath = path
+                    voiceprintFailedAt = 0L
                 } else {
                     created.close()
+                    voiceprintFailedAt = System.currentTimeMillis()
                 }
             }
             voiceprint

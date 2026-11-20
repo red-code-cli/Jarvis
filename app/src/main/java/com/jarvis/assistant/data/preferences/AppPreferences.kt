@@ -74,6 +74,7 @@ class AppPreferences(context: Context) {
         private const val KEY_OWNER_VOICE_THRESHOLD = "key_owner_voice_threshold"
         private const val KEY_OWNER_VOICE_SAMPLE_COUNT = "key_owner_voice_sample_count"
         private const val KEY_OWNER_VOICE_FORMAT = "key_owner_voice_format"
+        private const val KEY_VOICE_ENROLL_PROMPT_AT = "key_voice_enroll_prompt_at"
         // Speaker-embedding version stored alongside the profile: legacy builds saved 128-d
         // x-vectors, the sherpa-onnx engine saves CAM++ embeddings (192-d). Because the two live
         // in different vector spaces, a legacy profile is treated as "not enrolled" so the user
@@ -146,6 +147,11 @@ class AppPreferences(context: Context) {
     var ownerVoiceSampleCount: Int
         get() = prefs.getInt(KEY_OWNER_VOICE_SAMPLE_COUNT, 0)
         set(value) = prefs.edit().putInt(KEY_OWNER_VOICE_SAMPLE_COUNT, value).apply()
+
+    /** Last time the "enroll your voice" hint was spoken/shown (new key, default 0 = never). */
+    var voiceEnrollPromptAt: Long
+        get() = prefs.getLong(KEY_VOICE_ENROLL_PROMPT_AT, 0L)
+        set(value) = prefs.edit().putLong(KEY_VOICE_ENROLL_PROMPT_AT, value).apply()
 
     fun hasOwnerVoiceProfile(): Boolean {
         if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return false
