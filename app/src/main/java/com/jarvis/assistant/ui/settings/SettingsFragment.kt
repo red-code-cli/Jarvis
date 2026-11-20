@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -55,6 +56,8 @@ class SettingsFragment : Fragment() {
         setupClickListeners()
         setupCategoryJump()
         setupVoiceThreshold()
+        updateVoicePhoneAdvancedState(animate = false)
+        setupVoicePhoneAdvancedToggle()
         harnessSettings = HarnessSettingsController(this, binding).also { it.bind() }
     }
 
@@ -63,6 +66,36 @@ class SettingsFragment : Fragment() {
         if (_binding != null) {
             com.jarvis.assistant.util.ThemeManager.applyDynamicBackground(binding.root)
             loadUserData()
+            applyPendingPermissionToggles()
+        }
+    }
+
+    private var pendingEnableCallControl = false
+    private var pendingEnableUnreadMessages = false
+
+    /** Flips advanced toggles on once the permission they needed is granted. */
+    private fun applyPendingPermissionToggles() {
+        val ctx = requireContext()
+        if (pendingEnableCallControl &&
+            com.jarvis.assistant.util.PermissionHelper.hasAnswerPhoneCallsPermission(ctx) &&
+            com.jarvis.assistant.util.PermissionHelper.hasNotificationListenerAccess(ctx)
+        ) {
+            pendingEnableCallControl = false
+            suppressTriggerUpdates = true
+            preferences.isVoiceCallAnsweringEnabled = true
+            binding.switchVoiceCallAnswering.isChecked = true
+            suppressTriggerUpdates = false
+            Toast.makeText(ctx, "Call control ON • 'Pick karo' / 'Cut karo' chalega", Toast.LENGTH_SHORT).show()
+        }
+        if (pendingEnableUnreadMessages &&
+            com.jarvis.assistant.util.PermissionHelper.hasNotificationListenerAccess(ctx)
+        ) {
+            pendingEnableUnreadMessages = false
+            suppressTriggerUpdates = true
+            preferences.isUnreadMessagesReaderEnabled = true
+            binding.switchUnreadMessages.isChecked = true
+            suppressTriggerUpdates = false
+            Toast.makeText(ctx, "Unread reader ON • naye message padh ke sunayega", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -86,22 +119,31 @@ class SettingsFragment : Fragment() {
 
         // Owner Voice Profile Status
         val hasVoiceProfile = preferences.hasOwnerVoiceProfile()
+        val ownerVoiceOn = preferences.isOwnerVoiceEnabled
         if (hasVoiceProfile) {
-            binding.tvOwnerVoiceBadge.text = "ACTIVE"
-            binding.tvOwnerVoiceBadge.setTextColor(Color.parseColor("#10B981"))
-            binding.tvOwnerVoiceBadge.setBackgroundResource(R.drawable.bg_jarvis_status_badge_green)
-            binding.tvOwnerVoiceSubtitle.text = "Voice Profile Active • Only you can speak"
+            binding.tvOwnerVoiceBadge.text = if (ownerVoiceOn) "ACTIVE" else "PAUSED"
+            binding.tvOwnerVoiceBadge.setTextColor(Color.parseColor(if (ownerVoiceOn) "#10B981" else "#F59E0B"))
+            binding.tvOwnerVoiceBadge.setBackgroundResource(if (ownerVoiceOn) R.drawable.bg_jarvis_status_badge_green else R.drawable.bg_jarvis_status_badge)
+            binding.tvOwnerVoiceSubtitle.text = if (ownerVoiceOn) {
+                "Voice profile active • sirf aapki awaaz"
+            } else {
+                "Voice profile paused • owner-only OFF hai"
+            }
 
-            binding.tvProfileVoiceStatus.text = "VOICE ENROLLED"
-            binding.tvProfileVoiceStatus.setTextColor(Color.parseColor("#10B981"))
-            binding.chipProfileVoiceStatus.setBackgroundResource(R.drawable.bg_jarvis_status_badge_green)
+            binding.tvProfileVoiceStatus.text = if (ownerVoiceOn) "VOICE ENROLLED" else "VOICE PAUSED"
+            binding.tvProfileVoiceStatus.setTextColor(Color.parseColor(if (ownerVoiceOn) "#10B981" else "#F59E0B"))
+            binding.chipProfileVoiceStatus.setBackgroundResource(if (ownerVoiceOn) R.drawable.bg_jarvis_status_badge_green else R.drawable.bg_jarvis_status_badge)
             binding.ivProfileVoiceBadgeIcon.setImageResource(R.drawable.ic_verified_badge)
-            binding.ivProfileVoiceBadgeIcon.imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#10B981"))
+            binding.ivProfileVoiceBadgeIcon.imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor(if (ownerVoiceOn) "#10B981" else "#F59E0B"))
         } else {
             binding.tvOwnerVoiceBadge.text = "SETUP"
             binding.tvOwnerVoiceBadge.setTextColor(ContextCompat.getColor(requireContext(), R.color.accent_sapphire))
             binding.tvOwnerVoiceBadge.setBackgroundResource(R.drawable.bg_jarvis_status_badge)
-            binding.tvOwnerVoiceSubtitle.text = "Not enrolled • Tap to record voice profile"
+            binding.tvOwnerVoiceSubtitle.text = if (ownerVoiceOn) {
+                "Profile missing • fail-open hai, enroll karo"
+            } else {
+                "Enroll nahi hua • tap karke voice profile record karo"
+            }
 
             binding.tvProfileVoiceStatus.text = "ENROLL VOICE"
             binding.tvProfileVoiceStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.accent_sapphire))
@@ -139,17 +181,13 @@ class SettingsFragment : Fragment() {
         // Smart Battery Saver
         binding.switchBatterySaver.isChecked = preferences.isSmartBatterySaverEnabled
 
-        // Background Noise Filter
+        // Background Noise Filter (guarded so permission dialogs never fire from state restore)
+        suppressTriggerUpdates = true
         binding.switchNoiseFilter.isChecked = preferences.isNoiseFilterEnabled
-
-        // Voice Call Control (Pick/Cut)
         binding.switchVoiceCallAnswering.isChecked = preferences.isVoiceCallAnsweringEnabled
-
-        // Unread Messages Reader
         binding.switchUnreadMessages.isChecked = preferences.isUnreadMessagesReaderEnabled
-
-        // Shake to Talk
         binding.switchShakeToTalk.isChecked = preferences.isShakeToTalkEnabled
+        suppressTriggerUpdates = false
 
         // Anti Theft Alarm
         binding.switchAntiTheftAlarm.isChecked = preferences.isAntiTheftAlarmEnabled
@@ -166,12 +204,11 @@ class SettingsFragment : Fragment() {
         binding.tvCurrentModel.text = "$modelDisplay • Live WebSocket"
 
         // Theme
-        binding.tvCurrentTheme.text = when (preferences.appTheme) {
-            "dark" -> "Dark Theme"
-            "red" -> "Red Theme"
-            "sunset" -> "Sunset Theme"
-            "custom" -> "Custom (${preferences.customThemeColor})"
-            else -> "Ice Blue Theme"
+        val themeKey = preferences.appTheme
+        binding.tvCurrentTheme.text = if (themeKey == com.jarvis.assistant.util.ThemeRegistry.CUSTOM_KEY) {
+            "Custom (${preferences.customThemeColor})"
+        } else {
+            com.jarvis.assistant.util.ThemeRegistry.displayName(themeKey)
         }
     }
 
@@ -192,6 +229,86 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    /** Applies the saved expanded/collapsed state of the advanced voice & phone card. */
+    private fun updateVoicePhoneAdvancedState(animate: Boolean) {
+        val expanded = preferences.isAdvancedVoicePhoneControlsExpanded
+        val content = binding.voicePhoneAdvancedContent
+        val chevron = binding.imgVoicePhoneAdvancedChevron
+        if (animate) {
+            content.animate().alpha(if (expanded) 1f else 0f).withLayer().setDuration(180L).start()
+            content.postDelayed({
+                content.visibility = if (expanded) View.VISIBLE else View.GONE
+            }, if (expanded) 0L else 180L)
+            chevron.animate().rotation(if (expanded) 90f else 0f).setDuration(180L).start()
+        } else {
+            content.alpha = 1f
+            content.visibility = if (expanded) View.VISIBLE else View.GONE
+            chevron.rotation = if (expanded) 90f else 0f
+        }
+    }
+
+    /** Toggles the advanced voice & phone controls card on header tap. */
+    private fun setupVoicePhoneAdvancedToggle() {
+        binding.voicePhoneAdvancedHeader.setOnClickListener {
+            val next = !preferences.isAdvancedVoicePhoneControlsExpanded
+            preferences.isAdvancedVoicePhoneControlsExpanded = next
+            updateVoicePhoneAdvancedState(animate = true)
+        }
+    }
+
+    private var suppressTriggerUpdates = false
+
+    /**
+     * Blocks a toggle from flipping on until the needed permission is granted. Shows a
+     * Hinglish warning and opens the permission flow. Returns true when the change is allowed.
+     */
+    private fun requireCallControlPermission(enabling: Boolean): Boolean {
+        if (!enabling) return true
+        val hasAnswer = com.jarvis.assistant.util.PermissionHelper.hasAnswerPhoneCallsPermission(requireContext())
+        val hasNotif = com.jarvis.assistant.util.PermissionHelper.hasNotificationListenerAccess(requireContext())
+        if (hasAnswer && hasNotif) return true
+        suppressTriggerUpdates = true
+        binding.switchVoiceCallAnswering.isChecked = false
+        suppressTriggerUpdates = false
+        pendingEnableCallControl = true
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Permission chahiye")
+            .setMessage(
+                "Call control (Pick/Cut) ke liye do permissions zaroori hain:\n\n" +
+                    "• 'Call kholna/band karna' — call handle karne ke liye\n" +
+                    "• Notification access — call ka pata chalne ke liye\n\n" +
+                    "Permission section me jaakar dono ON karo."
+            )
+            .setPositiveButton("Permission do") { _, _ ->
+                startActivity(Intent(requireContext(), PermissionActivity::class.java))
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+        return false
+    }
+
+    /** Blocks Unread Messages Reader until notification access is granted. */
+    private fun requireNotificationAccess(enabling: Boolean): Boolean {
+        if (!enabling) return true
+        if (com.jarvis.assistant.util.PermissionHelper.hasNotificationListenerAccess(requireContext())) return true
+        suppressTriggerUpdates = true
+        binding.switchUnreadMessages.isChecked = false
+        suppressTriggerUpdates = false
+        pendingEnableUnreadMessages = true
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Notification access chahiye")
+            .setMessage(
+                "Unread messages reader naye messages dekhne ke liye Notification access use karta hai.\n\n" +
+                    "Permission section me jaakar 'Notification access' ON karo."
+            )
+            .setPositiveButton("Permission do") { _, _ ->
+                startActivity(Intent(requireContext(), PermissionActivity::class.java))
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+        return false
+    }
+
     /** Scrolls the existing settings ScrollView to a section; no layout or values change. */
     private fun scrollToSettings(target: View) {
         var y = 0
@@ -207,9 +324,9 @@ class SettingsFragment : Fragment() {
         updateVoiceThresholdLabel()
         binding.rowOwnerVoiceThreshold.setOnClickListener {
             val labels = arrayOf(
-                "Strict — high security, may reject you in noise",
+                "Strict — high security, shor me aapko bhi reject kar sakta hai",
                 "Balanced — recommended",
-                "Relaxed — tolerates TV/background noise",
+                "Relaxed — TV/background noise tolerate karta hai",
             )
             val current = preferences.ownerVoiceThreshold
             val checked = when {
@@ -236,10 +353,79 @@ class SettingsFragment : Fragment() {
     private fun updateVoiceThresholdLabel() {
         val threshold = preferences.ownerVoiceThreshold
         binding.tvOwnerVoiceThresholdMode.text = when {
-            threshold <= com.jarvis.assistant.audio.OwnerVoiceManager.STRICT_THRESHOLD -> "Strict · high security"
-            threshold >= com.jarvis.assistant.audio.OwnerVoiceManager.RELAXED_THRESHOLD -> "Relaxed · noisy rooms"
+            threshold <= com.jarvis.assistant.audio.OwnerVoiceManager.STRICT_THRESHOLD -> "Strict · zyada security"
+            threshold >= com.jarvis.assistant.audio.OwnerVoiceManager.RELAXED_THRESHOLD -> "Relaxed · shor wale kamre"
             else -> "Balanced · recommended"
+        }    }
+
+    /**
+     * Per-app notification allow/deny dialog. Lists every package the listener has
+     * recently seen (plus the built-in messaging apps) with a switch per app.
+     * Stored encrypted; denied apps are never read aloud or auto-replied.
+     */
+    private fun showNotificationAppsDialog() {
+        val context = requireContext()
+        val prefs = preferences
+        val knownPackages = linkedMapOf(
+            "com.whatsapp" to "WhatsApp",
+            "com.whatsapp.w4b" to "WhatsApp Business",
+            "com.facebook.orca" to "Messenger",
+            "com.instagram.android" to "Instagram"
+        )
+        for (pkg in prefs.notificationSeenPackages.sorted()) {
+            if (pkg !in knownPackages) {
+                val label = try {
+                    val info = context.packageManager.getApplicationInfo(pkg, 0)
+                    context.packageManager.getApplicationLabel(info).toString()
+                } catch (_: Throwable) {
+                    pkg.substringAfterLast('.').ifBlank { pkg }
+                }
+                knownPackages[pkg] = label
+            }
         }
+        if (knownPackages.isEmpty()) {
+            MaterialAlertDialogBuilder(context)
+                .setTitle("Notification apps")
+                .setMessage("Abhi tak koi notification nahi aayi. Jaisi hi apps se notifications aayengi, yahan unhe manage kar paoge.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        val itemsLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 16, 48, 8)
+        }
+        for ((pkg, label) in knownPackages) {
+            val denied = prefs.isNotificationPackageDenied(pkg)
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, 8, 0, 8)
+            }
+            val name = android.widget.TextView(context).apply {
+                text = label
+                setTextColor(0xFF202124.toInt())
+                textSize = 15f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            val toggle = com.google.android.material.switchmaterial.SwitchMaterial(context).apply {
+                isChecked = !denied
+                setOnCheckedChangeListener { _, isChecked ->
+                    prefs.setNotificationPackageDenied(pkg, !isChecked)
+                }
+            }
+            row.addView(name)
+            row.addView(toggle)
+            itemsLayout.addView(row)
+        }
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle("Notification apps")
+            .setMessage("Off matlab un apps ki notifications kabhi nahi suni/parhi jayengi")
+            .setView(itemsLayout)
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun setupClickListeners() {
@@ -287,6 +473,10 @@ class SettingsFragment : Fragment() {
             showWakeWordDialog()
         }
 
+        binding.rowNotificationApps.setOnClickListener {
+            showNotificationAppsDialog()
+        }
+
         binding.switchBatterySaver.setOnCheckedChangeListener { _, isChecked ->
             preferences.isSmartBatterySaverEnabled = isChecked
             val msg = if (isChecked) "Smart Battery Saver Enabled" else "Smart Battery Saver Disabled"
@@ -295,25 +485,29 @@ class SettingsFragment : Fragment() {
 
         binding.switchNoiseFilter.setOnCheckedChangeListener { _, isChecked ->
             preferences.isNoiseFilterEnabled = isChecked
-            val msg = if (isChecked) "Background Noise Filter Enabled" else "Background Noise Filter Disabled"
+            val msg = if (isChecked) "Noise filter ON • TV/shoor ignore hoga" else "Noise filter OFF • purana audio path"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
 
         binding.switchVoiceCallAnswering.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressTriggerUpdates) return@setOnCheckedChangeListener
+            if (!requireCallControlPermission(isChecked)) return@setOnCheckedChangeListener
             preferences.isVoiceCallAnsweringEnabled = isChecked
-            val msg = if (isChecked) "Voice Call Control Enabled (Pick/Cut)" else "Voice Call Control Disabled"
+            val msg = if (isChecked) "Call control ON • 'Pick karo' / 'Cut karo' chalega" else "Call control OFF"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
 
         binding.switchUnreadMessages.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressTriggerUpdates) return@setOnCheckedChangeListener
+            if (!requireNotificationAccess(isChecked)) return@setOnCheckedChangeListener
             preferences.isUnreadMessagesReaderEnabled = isChecked
-            val msg = if (isChecked) "Unread Messages Reader Enabled" else "Unread Messages Reader Disabled"
+            val msg = if (isChecked) "Unread reader ON • naye message padh ke sunayega" else "Unread reader OFF"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
 
         binding.switchShakeToTalk.setOnCheckedChangeListener { _, isChecked ->
             preferences.isShakeToTalkEnabled = isChecked
-            val msg = if (isChecked) "Shake-to-Talk Enabled" else "Shake-to-Talk Disabled"
+            val msg = if (isChecked) "Shake-to-talk ON • 2 baar hilao, baat shuru" else "Shake-to-talk OFF"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
 

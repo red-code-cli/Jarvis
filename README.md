@@ -157,7 +157,9 @@ it, so users get the update in-app.
 
 1. Bump `versionCode` (and `versionName`) in `app/build.gradle.kts`. The APK is built once
    on merge to `main` with the **same keystore** (`app/keystore/jarvis-release.jks`) — a
-   different signer cannot over-install.
+   different signer cannot over-install. (The workflow auto-increments the versionCode for
+   each build — `versionCodeOverride` / `versionNameOverride` — so a manual bump is only
+   needed when you want a specific name to publish.)
 2. The workflow generates `update.json` from the built APK (SHA-256, size, version fields)
    using [`scripts/make_update_json.sh`](scripts/make_update_json.sh) and publishes it with
    the APK. The app reads a single source of truth: `UPDATE_MANIFEST_URL` in
@@ -169,6 +171,30 @@ it, so users get the update in-app.
 4. To host the manifest differently (no CI), build the APK and run
    `scripts/make_update_json.sh <apk> <code> <name> <https apkUrl> [minSupported] [mandatory]`
    yourself, then upload both files.
+
+### Release guide (Hinglish)
+
+Ye release workflow khud sab kuch kar deta hai — **ek release = ek APK build**, sirf GitHub
+Actions par, merge ke baad:
+
+- **PR / branch** par sirf tests, lint, compile aur R8 check chalta hai — koi APK nahi banta.
+- **`main` par merge** hote hi single signed APK build hota hai (wahi stable keystore),
+  `update.json` banata hai, aur GitHub Release banata hai `v<versionName>` tag ke saath.
+- Release notes me **SHA-256 checksum** aur Hinglish changelog apne-aap aa jata hai.
+- **Manual re-release**: `.github/workflows/android-release.yml` me `workflow_dispatch` se
+  (Actions tab → Run workflow) kisi bhi commit se release nikal sakte ho, ya `v*` tag push
+  karke.
+- **Keystore secret**: agar `JARVIS_RELEASE_KEYSTORE_B64` secret set hai to wahi use hota
+  hai (temp file me decode → build → delete). Nahi to committed keystore.
+- **Certificate pinning**: `JARVIS_RELEASE_CERT_SHA256` secret set ho to build ke baad APK
+  ka certificate match kiya jata hai, mismatch par fail.
+- Version tag / manual dispatch se versionName override hota hai; versionCode hamesha
+  auto-increment hota hai (kabhi ghatta nahi).
+
+**Rules (AGENTS.md)** — release se pehle check karo: current branch aur working tree clean,
+koi active CI run nahi, changes already commit me hain, aur APK is release ke liye pehle se
+nahi bana. APK sirf ek baar, `main` merge ke baad, GitHub Actions par banta hai. Kabhi
+local Gradle/APK build nahi.
 
 FCM "instant push" (topic `app-update`) is intentionally not wired up yet because the
 project has no `google-services.json`; the feature works fully without it. See

@@ -27,10 +27,53 @@ class AppPreferences(context: Context) {
         Log.e(TAG, "Secure API-key storage could not be initialized", e)
         null
     }
+
+    /**
+     * Speaker embeddings are biometric data. They live in their own AES-256 encrypted
+     * SharedPreferences file, separate from the API key. If the keystore is temporarily
+     * unavailable we fall back to the old plain file so an existing profile is never lost.
+     */
+    private val secureVoicePrefs: SharedPreferences? = try {
+        val masterKey = MasterKey.Builder(context.applicationContext)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context.applicationContext,
+            ENCRYPTED_VOICE_PREF_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        Log.e(TAG, "Encrypted voiceprint storage could not be initialized; using legacy storage", e)
+        null
+    }
+
+    /**
+     * Per-app notification allow/deny policy (which apps may be read aloud or
+     * auto-replied). App choices are personal data, so they are stored in their
+     * own AES-256 encrypted prefs file, never in the plain one.
+     */
+    private val secureNotificationPrefs: SharedPreferences? = try {
+        val masterKey = MasterKey.Builder(context.applicationContext)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context.applicationContext,
+            ENCRYPTED_NOTIF_PREF_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        Log.e(TAG, "Encrypted notification policy storage could not be initialized", e)
+        null
+    }
     private val gson = Gson()
 
     init {
         migrateApiKeyToEncryptedStorage()
+        migrateVoiceProfileToEncryptedStorage()
         val current = prefs.getString(KEY_MODEL, null)
         if (current == null || current !in GeminiConstants.SUPPORTED_MODELS) {
             prefs.edit().putString(KEY_MODEL, GeminiConstants.DEFAULT_MODEL).apply()
@@ -40,6 +83,10 @@ class AppPreferences(context: Context) {
     companion object {
         private const val PREF_NAME = "jarvis_prefs"
         private const val ENCRYPTED_API_PREF_NAME = "jarvis_secure_api_prefs"
+        private const val ENCRYPTED_VOICE_PREF_NAME = "jarvis_secure_voice_prefs"
+        private const val ENCRYPTED_NOTIF_PREF_NAME = "jarvis_secure_notif_prefs"
+        private const val KEY_NOTIFICATION_DENIED_PACKAGES = "key_notification_denied_packages"
+        private const val KEY_NOTIFICATION_SEEN_PACKAGES = "key_notification_seen_packages"
         private const val TAG = "AppPreferences"
         private const val KEY_API_KEY = "key_api_key"
         private const val KEY_MODEL = "key_model"
@@ -60,6 +107,7 @@ class AppPreferences(context: Context) {
         private const val KEY_EMERGENCY_CONTACT_PHONE = "key_emergency_contact_phone"
         private const val KEY_ANTI_THEFT_ALARM_ENABLED = "key_anti_theft_alarm_enabled"
         private const val KEY_SHAKE_TO_TALK_ENABLED = "key_shake_to_talk_enabled"
+        private const val KEY_ADVANCED_VOICE_PHONE_EXPANDED = "key_advanced_voice_phone_expanded"
         private const val KEY_CHAT_HISTORY = "key_chat_history"
         private const val KEY_FAVORITE_SONG = "key_favorite_song"
         private const val KEY_FAVORITE_APP = "key_favorite_app"
@@ -74,6 +122,7 @@ class AppPreferences(context: Context) {
         private const val KEY_OWNER_VOICE_THRESHOLD = "key_owner_voice_threshold"
         private const val KEY_OWNER_VOICE_SAMPLE_COUNT = "key_owner_voice_sample_count"
         private const val KEY_OWNER_VOICE_FORMAT = "key_owner_voice_format"
+        private const val KEY_VOICE_ENROLL_PROMPT_AT = "key_voice_enroll_prompt_at"
         // Speaker-embedding version stored alongside the profile: legacy builds saved 128-d
         // x-vectors, the sherpa-onnx engine saves CAM++ embeddings (192-d). Because the two live
         // in different vector spaces, a legacy profile is treated as "not enrolled" so the user
@@ -147,15 +196,50 @@ class AppPreferences(context: Context) {
         get() = prefs.getInt(KEY_OWNER_VOICE_SAMPLE_COUNT, 0)
         set(value) = prefs.edit().putInt(KEY_OWNER_VOICE_SAMPLE_COUNT, value).apply()
 
+    /** Last time the "enroll your voice" hint was spoken/shown (new key, default 0 = never). */
+    var voiceEnrollPromptAt: Long
+        get() = prefs.getLong(KEY_VOICE_ENROLL_PROMPT_AT, 0L)
+        set(value) = prefs.edit().putLong(KEY_VOICE_ENROLL_PROMPT_AT, value).apply()
+
+    /** Reads a biometric blob from the encrypted store first, then the legacy plain store. */
+    private fun readVoiceString(key: String): String? {
+        val encrypted = secureVoicePrefs?.getString(key, null)
+        if (!encrypted.isNullOrBlank()) return encrypted
+        return prefs.getString(key, null)
+    }
+
+    /** Copies any pre-upgrade plaintext voiceprint into encrypted storage exactly once. */
+    private fun migrateVoiceProfileToEncryptedStorage() {
+        val secure = secureVoicePrefs ?: return
+        try {
+            if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return
+            val legacyProfile = prefs.getString(KEY_OWNER_VOICE_PROFILE, null)
+            val legacySamples = prefs.getString(KEY_OWNER_VOICE_SAMPLES, null)
+            if (legacyProfile.isNullOrBlank()) return
+            if (!secure.getString(KEY_OWNER_VOICE_PROFILE, null).isNullOrBlank()) {
+                // Already migrated earlier; just remove the plaintext copy.
+                prefs.edit().remove(KEY_OWNER_VOICE_PROFILE).remove(KEY_OWNER_VOICE_SAMPLES).apply()
+                return
+            }
+            val editor = secure.edit().putString(KEY_OWNER_VOICE_PROFILE, legacyProfile)
+            if (!legacySamples.isNullOrBlank()) editor.putString(KEY_OWNER_VOICE_SAMPLES, legacySamples)
+            if (editor.commit()) {
+                prefs.edit().remove(KEY_OWNER_VOICE_PROFILE).remove(KEY_OWNER_VOICE_SAMPLES).apply()
+                Log.i(TAG, "Voiceprint migrated to encrypted storage")
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Voiceprint encryption migration skipped: ${t.message}")
+        }
+    }
+
     fun hasOwnerVoiceProfile(): Boolean {
         if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return false
-        val str = prefs.getString(KEY_OWNER_VOICE_PROFILE, null)
-        return !str.isNullOrBlank()
+        return !readVoiceString(KEY_OWNER_VOICE_PROFILE).isNullOrBlank()
     }
 
     fun getOwnerVoiceProfile(): FloatArray? {
         if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return null
-        val json = prefs.getString(KEY_OWNER_VOICE_PROFILE, null) ?: return null
+        val json = readVoiceString(KEY_OWNER_VOICE_PROFILE) ?: return null
         return try {
             val arr = org.json.JSONArray(json)
             FloatArray(arr.length()) { i -> arr.getDouble(i).toFloat() }
@@ -166,7 +250,7 @@ class AppPreferences(context: Context) {
 
     fun getOwnerVoiceSamples(): List<FloatArray> {
         if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return emptyList()
-        val json = prefs.getString(KEY_OWNER_VOICE_SAMPLES, null) ?: return emptyList()
+        val json = readVoiceString(KEY_OWNER_VOICE_SAMPLES) ?: return emptyList()
         return try {
             val root = org.json.JSONArray(json)
             val list = mutableListOf<FloatArray>()
@@ -196,12 +280,25 @@ class AppPreferences(context: Context) {
             samplesArr.put(arr)
         }
 
-        prefs.edit()
-            .putString(KEY_OWNER_VOICE_PROFILE, masterArr.toString())
-            .putString(KEY_OWNER_VOICE_SAMPLES, samplesArr.toString())
+        val editor = prefs.edit()
             .putInt(KEY_OWNER_VOICE_SAMPLE_COUNT, sampleVectors.size)
             .putInt(KEY_OWNER_VOICE_FORMAT, OWNER_VOICE_FORMAT_SHERPA)
             .putBoolean(KEY_OWNER_VOICE_ENABLED, true)
+        val secure = secureVoicePrefs
+        if (secure != null) {
+            val saved = secure.edit()
+                .putString(KEY_OWNER_VOICE_PROFILE, masterArr.toString())
+                .putString(KEY_OWNER_VOICE_SAMPLES, samplesArr.toString())
+                .commit()
+            if (saved) {
+                editor.remove(KEY_OWNER_VOICE_PROFILE).remove(KEY_OWNER_VOICE_SAMPLES).apply()
+                return
+            }
+            Log.w(TAG, "Encrypted voiceprint save failed; keeping a functional legacy copy")
+        }
+        editor
+            .putString(KEY_OWNER_VOICE_PROFILE, masterArr.toString())
+            .putString(KEY_OWNER_VOICE_SAMPLES, samplesArr.toString())
             .apply()
     }
 
@@ -210,12 +307,21 @@ class AppPreferences(context: Context) {
         for (v in profile) {
             arr.put(v.toDouble())
         }
-        prefs.edit()
-            .putString(KEY_OWNER_VOICE_PROFILE, arr.toString())
+        val editor = prefs.edit()
             .putInt(KEY_OWNER_VOICE_SAMPLE_COUNT, sampleCount)
             .putInt(KEY_OWNER_VOICE_FORMAT, OWNER_VOICE_FORMAT_SHERPA)
             .putBoolean(KEY_OWNER_VOICE_ENABLED, true)
-            .apply()
+        val secure = secureVoicePrefs
+        if (secure != null) {
+            val saved = secure.edit()
+                .putString(KEY_OWNER_VOICE_PROFILE, arr.toString())
+                .commit()
+            if (saved) {
+                editor.remove(KEY_OWNER_VOICE_PROFILE).apply()
+                return
+            }
+        }
+        editor.putString(KEY_OWNER_VOICE_PROFILE, arr.toString()).apply()
     }
 
     fun clearOwnerVoiceProfile() {
@@ -226,6 +332,10 @@ class AppPreferences(context: Context) {
             .remove(KEY_OWNER_VOICE_FORMAT)
             .putBoolean(KEY_OWNER_VOICE_ENABLED, false)
             .apply()
+        secureVoicePrefs?.edit()
+            ?.remove(KEY_OWNER_VOICE_PROFILE)
+            ?.remove(KEY_OWNER_VOICE_SAMPLES)
+            ?.apply()
     }
 
     var apiKey: String
@@ -475,6 +585,51 @@ class AppPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_UNREAD_MESSAGES_READER, true)
         set(value) = prefs.edit().putBoolean(KEY_UNREAD_MESSAGES_READER, value).apply()
 
+    /** True when notifications from [pkg] are never read aloud or auto-replied. */
+    fun isNotificationPackageDenied(pkg: String): Boolean {
+        val secure = secureNotificationPrefs ?: return false
+        return try {
+            val raw = secure.getString(KEY_NOTIFICATION_DENIED_PACKAGES, null) ?: return false
+            val map: Map<String, Boolean>? =
+                gson.fromJson(raw, object : TypeToken<Map<String, Boolean>>() {}.type)
+            map?.get(pkg) == true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /** Sets the deny state for [pkg] in the encrypted store. */
+    fun setNotificationPackageDenied(pkg: String, denied: Boolean) {
+        val secure = secureNotificationPrefs ?: return
+        try {
+            val raw = secure.getString(KEY_NOTIFICATION_DENIED_PACKAGES, null)
+            val map: MutableMap<String, Boolean> = raw?.let {
+                gson.fromJson(it, object : TypeToken<MutableMap<String, Boolean>>() {}.type)
+            } ?: mutableMapOf()
+            if (denied) map[pkg] = true else map.remove(pkg)
+            secure.edit().putString(KEY_NOTIFICATION_DENIED_PACKAGES, gson.toJson(map)).apply()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not persist notification policy", e)
+        }
+    }
+
+    /** Recently seen notification packages, used only to populate the per-app settings list. */
+    var notificationSeenPackages: Set<String>
+        get() = prefs.getStringSet(KEY_NOTIFICATION_SEEN_PACKAGES, emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_NOTIFICATION_SEEN_PACKAGES, value).apply()
+
+    /** Records that we saw a notification from [pkg] (capped to keep the list small). */
+    fun addNotificationSeenPackage(pkg: String) {
+        val seen = notificationSeenPackages.toMutableSet()
+        seen.add(pkg)
+        if (seen.size > 50) {
+            val sorted = seen.sortedByDescending { it }.take(50).toMutableSet()
+            notificationSeenPackages = sorted
+        } else {
+            notificationSeenPackages = seen
+        }
+    }
+
     /** Emergency Voice SOS: "Code Red" / "Emergency" sends live location to contact. */
     var isEmergencySosEnabled: Boolean
         get() = prefs.getBoolean(KEY_EMERGENCY_SOS_ENABLED, true)
@@ -494,6 +649,11 @@ class AppPreferences(context: Context) {
     var isShakeToTalkEnabled: Boolean
         get() = prefs.getBoolean(KEY_SHAKE_TO_TALK_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_SHAKE_TO_TALK_ENABLED, value).apply()
+
+    /** Whether the "Advanced voice & phone controls" settings card is expanded. */
+    var isAdvancedVoicePhoneControlsExpanded: Boolean
+        get() = prefs.getBoolean(KEY_ADVANCED_VOICE_PHONE_EXPANDED, false)
+        set(value) = prefs.edit().putBoolean(KEY_ADVANCED_VOICE_PHONE_EXPANDED, value).apply()
 
     var isSilentExecutionMode: Boolean
         get() = prefs.getBoolean(KEY_SILENT_EXECUTION_MODE, false)

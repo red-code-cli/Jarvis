@@ -185,72 +185,100 @@ class SherpaWakeEngine(
 
     private fun runLoop() {
         var failures = 0
-        while (running) {
-            var spotter: KeywordSpotter? = null
-            var stream: OnlineStream? = null
-            var record: AudioRecord? = null
-            try {
-                spotter = buildSpotter()
-                // Each element is one keyword phrase: BPE tokens separated by spaces, with an
-                // optional "@display phrase". The native API separates phrases with "/".
-                stream = spotter.createStream(keywords.joinToString("/"))
-                record = openMicrophone() ?: throw IllegalStateException("No usable microphone input")
-                activeRecord = record
-                record.startRecording()
-                if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
-                    throw IllegalStateException("Microphone did not start recording")
-                }
-                failures = 0
-                Log.i(TAG, "sherpa-onnx KWS active (source=${record.audioSource})")
-
-                val shortBuffer = ShortArray(CHUNK_SAMPLES)
-                val floatBuffer = FloatArray(CHUNK_SAMPLES)
-                while (running) {
-                    val read = record.read(shortBuffer, 0, shortBuffer.size)
-                    if (read <= 0) {
-                        if (read == AudioRecord.ERROR_DEAD_OBJECT || read == AudioRecord.ERROR_INVALID_OPERATION) {
-                            throw IllegalStateException("Microphone read failed: $read")
-                        }
+        // Load the KWS model ONCE and keep it across microphone failures. Rebuilding the
+        // native spotter on every retry was the slow part of recovery (hundreds of ms each
+        // time) and also spiked memory. It is released only when the engine really stops or
+        // when the model itself cannot create a stream.
+        var spotter: KeywordSpotter? = null
+        try {
+            while (running) {
+                if (spotter == null) {
+                    try {
+                        spotter = buildSpotter()
+                        failures = 0
+                        Log.i(TAG, "sherpa-onnx KWS model loaded")
+                    } catch (t: Throwable) {
+                        if (!running) break
+                        failures++
+                        Log.w(TAG, "KWS model load failed #$failures: ${t.message}")
+                        onError("Wake model retry: ${t.message}")
+                        sleepWhileRunning(min(3000L, 500L * failures))
                         continue
                     }
-                    lastAudioFrameAt = System.currentTimeMillis()
-                    var sum = 0.0
-                    for (i in 0 until read) {
-                        val s = shortBuffer[i]
-                        sum += s.toDouble() * s
-                        floatBuffer[i] = s / 32768.0f
-                    }
-                    lastRms = sqrt(sum / read).toFloat()
-                    updatePeakRms(lastRms)
-                    noiseFloor = WakeVad.nextNoiseFloor(noiseFloor, lastRms)
-                    appendHistory(shortBuffer, read)
+                }
 
-                    stream.acceptWaveform(floatBuffer.copyOf(read), SAMPLE_RATE)
-                    while (spotter.isReady(stream)) {
-                        spotter.decode(stream)
-                        val result = spotter.getResult(stream)
-                        val keyword = result.keyword
-                        if (keyword.isNotBlank()) {
-                            spotter.reset(stream)
-                            dispatchKeyword(keyword)
+                var stream: OnlineStream? = null
+                var record: AudioRecord? = null
+                try {
+                    // Each element is one keyword phrase: BPE tokens separated by spaces, with an
+                    // optional "@display phrase". The native API separates phrases with "/".
+                    stream = spotter.createStream(keywords.joinToString("/"))
+                    val kws = spotter ?: break
+                    val input = stream ?: break
+                    record = openMicrophone() ?: throw IllegalStateException("No usable microphone input")
+                    activeRecord = record
+                    record.startRecording()
+                    if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                        throw IllegalStateException("Microphone did not start recording")
+                    }
+                    failures = 0
+                    Log.i(TAG, "sherpa-onnx KWS active (source=${record.audioSource})")
+
+                    val shortBuffer = ShortArray(CHUNK_SAMPLES)
+                    val floatBuffer = FloatArray(CHUNK_SAMPLES)
+                    while (running) {
+                        val read = record.read(shortBuffer, 0, shortBuffer.size)
+                        if (read <= 0) {
+                            if (read == AudioRecord.ERROR_DEAD_OBJECT || read == AudioRecord.ERROR_INVALID_OPERATION) {
+                                throw IllegalStateException("Microphone read failed: $read")
+                            }
+                            continue
+                        }
+                        lastAudioFrameAt = System.currentTimeMillis()
+                        var sum = 0.0
+                        for (i in 0 until read) {
+                            val s = shortBuffer[i]
+                            sum += s.toDouble() * s
+                            floatBuffer[i] = s / 32768.0f
+                        }
+                        lastRms = sqrt(sum / read).toFloat()
+                        updatePeakRms(lastRms)
+                        noiseFloor = WakeVad.nextNoiseFloor(noiseFloor, lastRms)
+                        appendHistory(shortBuffer, read)
+
+                        input.acceptWaveform(floatBuffer.copyOf(read), SAMPLE_RATE)
+                        while (kws.isReady(input)) {
+                            kws.decode(input)
+                            val result = kws.getResult(input)
+                            val keyword = result.keyword
+                            if (keyword.isNotBlank()) {
+                                kws.reset(input)
+                                dispatchKeyword(keyword)
+                            }
                         }
                     }
+                } catch (t: Throwable) {
+                    if (running) {
+                        failures++
+                        Log.w(TAG, "Wake mic restart #$failures: ${t.message}")
+                        onError("Wake microphone retry: ${t.message}")
+                        // A model that cannot even open a stream is unusable; force a reload.
+                        if (stream == null) {
+                            runCatching { spotter?.release() }
+                            spotter = null
+                        }
+                        sleepWhileRunning(min(3000L, 350L * failures))
+                    }
+                } finally {
+                    runCatching { stream?.release() }
+                    runCatching { record?.stop() }
+                    runCatching { record?.release() }
+                    activeRecord = null
+                    releaseNoiseSuppressor()
                 }
-            } catch (t: Throwable) {
-                if (running) {
-                    failures++
-                    Log.w(TAG, "Wake mic restart #$failures: ${t.message}")
-                    onError("Wake microphone retry: ${t.message}")
-                    sleepWhileRunning(min(3000L, 350L * failures))
-                }
-            } finally {
-                runCatching { stream?.release() }
-                runCatching { spotter?.release() }
-                runCatching { record?.stop() }
-                runCatching { record?.release() }
-                activeRecord = null
-                releaseNoiseSuppressor()
             }
+        } finally {
+            runCatching { spotter?.release() }
         }
     }
 

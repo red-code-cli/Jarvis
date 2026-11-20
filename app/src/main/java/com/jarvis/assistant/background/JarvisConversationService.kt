@@ -27,8 +27,6 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.jarvis.assistant.JarvisApp
@@ -330,6 +328,7 @@ class JarvisConversationService : Service() {
     private var lastPlaybackEndTime = 0L
     private var hasSpeechInCurrentUtterance = false
     private var hasSignalledUtteranceEnd = false
+    @Volatile
     private var consecutiveVoicedFrames = 0
     private var totalVoicedFramesInCurrentUtterance = 0
     private var ambientNoiseFloor = 0.03f
@@ -344,6 +343,9 @@ class JarvisConversationService : Service() {
     private var isCurrentTurnOwnerVoiceVerified = false
     @Volatile
     private var ownerVerificationInconclusive = false
+    /** True only when the wake utterance was positively matched to the enrolled owner. */
+    @Volatile
+    private var lastWakeOwnerVerified = false
     // NOTE: The 120 s owner-verification lease anchored on this timestamp (see the
     // `120_000L` checks below) was reintroduced by PR #12 despite a separate product
     // decision to remove it. This is intentionally left exactly as PR #14 shipped it;
@@ -359,6 +361,13 @@ class JarvisConversationService : Service() {
     private val voiceGateBuffer = java.util.ArrayDeque<ByteArray>(64)
     @Volatile
     private var voiceGateOpen = true
+
+    /** Rolling assistant-playback-time audio used to speaker-verify a barge-in. */
+    private val bargeInAudio = java.io.ByteArrayOutputStream()
+    @Volatile
+    private var bargeInVerificationInFlight = false
+    @Volatile
+    private var lastBargeInRejectedAt = 0L
 
     private val conversationMemory by lazy {
         com.jarvis.assistant.memory.ConversationMemoryStore(applicationContext)
@@ -609,7 +618,7 @@ class JarvisConversationService : Service() {
     private var wakeModelSetupInFlight = false
     @Volatile
     private var wakeModelSetupFailedAt = 0L
-    private var tts: TextToSpeech? = null
+    private var voiceAnnouncer: com.jarvis.assistant.audio.JarvisVoiceAnnouncer? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
     private var standbyActivatedTime = 0L
@@ -644,7 +653,13 @@ class JarvisConversationService : Service() {
         super.onCreate()
         activeInstance = this
         createChannel()
-        initTts()
+        voiceAnnouncer = com.jarvis.assistant.audio.JarvisVoiceAnnouncer(
+            applicationContext,
+            apiKeyProvider = { preferences.apiKey },
+            modelProvider = { preferences.aiModel },
+            voiceNameProvider = { preferences.voice },
+            notificationChannelId = CHANNEL_ID
+        )
         startCallMonitor()
         initShakeDetector()
         ensureMicrophoneForegroundService()
@@ -743,39 +758,6 @@ class JarvisConversationService : Service() {
         }
     }
 
-    private fun initTts() {
-        try {
-            tts = TextToSpeech(applicationContext) { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    tts?.language = Locale.US
-                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                        override fun onStart(utteranceId: String?) {
-                            Log.d("JarvisService", "TTS onStart: $utteranceId")
-                        }
-
-                        override fun onDone(utteranceId: String?) {
-                            Log.d("JarvisService", "TTS onDone: $utteranceId")
-                            handleTtsDone(utteranceId)
-                        }
-
-                        @Deprecated("Deprecated in Java")
-                        override fun onError(utteranceId: String?) {
-                            Log.e("JarvisService", "TTS onError: $utteranceId")
-                            handleTtsDone(utteranceId)
-                        }
-
-                        override fun onError(utteranceId: String?, errorCode: Int) {
-                            Log.e("JarvisService", "TTS onError: $utteranceId code: $errorCode")
-                            handleTtsDone(utteranceId)
-                        }
-                    })
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("JarvisService", "Failed to init TTS: ${e.message}")
-        }
-    }
-
     private fun handleAntiTheftAlert() {
         serviceScope.launch(Dispatchers.Main) {
             vibrateBriefly()
@@ -783,7 +765,9 @@ class JarvisConversationService : Service() {
             val warning = "Warning! Intruder detected! Phone ko haath mat lagao! Roshan ke phone ko turant wapas rakho!"
             _events.emit("TABLE GUARD ALERT: Unauthorized motion detected!")
             try {
-                tts?.speak(warning, TextToSpeech.QUEUE_FLUSH, null, "anti_theft_alarm")
+                voiceAnnouncer?.speak(warning, "anti_theft_alarm") {
+                    handleAnnouncementDone("anti_theft_alarm")
+                }
             } catch (_: Throwable) {}
         }
     }
@@ -847,7 +831,7 @@ class JarvisConversationService : Service() {
         }
     }
 
-    private fun handleTtsDone(utteranceId: String?) {
+    private fun handleAnnouncementDone(utteranceId: String?) {
         // Local fallback speech only; natural Gemini Live neural audio remains the main voice.
         if (utteranceId?.startsWith("auto_update") == true ||
             utteranceId?.startsWith("task_done") == true ||
@@ -902,14 +886,21 @@ class JarvisConversationService : Service() {
                 if (_conversationState.value != ConversationState.SPEAKING) {
                     setConversationState(ConversationState.SPEAKING)
                 }
-                val speakResult = tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utterance)
-                    ?: TextToSpeech.ERROR
-                if (speakResult == TextToSpeech.SUCCESS) {
-                    lastSpokenUpdateAt = System.currentTimeMillis()
+                // Prefer the live Gemini session (it is already connected and audible);
+                // otherwise fall back to the one-shot announcer.
+                if (liveWebSocket?.isSessionReady() == true) {
+                    liveWebSocket?.sendClientContent(
+                        "System update: $clean Say exactly this update to the user in one short sentence now. Do not call any tool."
+                    )
+                } else {
+                    voiceAnnouncer?.speak(clean, utterance) {
+                        handleAnnouncementDone(utterance)
+                    }
                 }
-                Log.i("JarvisService", "Autonomous spoken update ($speakResult): $clean")
+                lastSpokenUpdateAt = System.currentTimeMillis()
+                Log.i("JarvisService", "Autonomous spoken update: $clean")
             } catch (t: Throwable) {
-                Log.w("JarvisService", "Autonomous TTS failed: ${t.message}")
+                Log.w("JarvisService", "Autonomous spoken update failed: ${t.message}")
                 if (_conversationState.value == ConversationState.SPEAKING) {
                     setConversationState(ConversationState.IDLE)
                 }
@@ -1193,10 +1184,15 @@ class JarvisConversationService : Service() {
         lastResponseTimedOut = false
         val now = System.currentTimeMillis()
         lastUserSpeechDetectedTime = now
-        lastOwnerVerifiedTimestamp = now
-        val wakeVerified = wakeTriggered && preferences.isOwnerVoiceEnabled && preferences.hasOwnerVoiceProfile()
-        isCurrentTurnOwnerVoiceVerified = wakeVerified || !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()
-        voiceGateOpen = wakeVerified || !ownerVerificationRequired()
+        val ownerGateRequired = preferences.isOwnerVoiceEnabled && preferences.hasOwnerVoiceProfile()
+        // Only a positively speaker-verified wake earns the owner lease. Previously every
+        // session (even a typed/non-owner wake) stamped `now` here, which silently opened the
+        // 120 s lease for anybody. Unenrolled users stay fail-open by design.
+        val wakeVerified = wakeTriggered && ownerGateRequired && lastWakeOwnerVerified
+        lastOwnerVerifiedTimestamp = if (!ownerGateRequired || wakeVerified) now else 0L
+        lastWakeOwnerVerified = false
+        isCurrentTurnOwnerVoiceVerified = wakeVerified || !ownerGateRequired
+        voiceGateOpen = wakeVerified || !ownerGateRequired
         synchronized(voiceGateBuffer) { voiceGateBuffer.clear() }
         ownerVerificationInconclusive = false
         pendingToolCalls.clear()
@@ -1241,6 +1237,8 @@ class JarvisConversationService : Service() {
                 }
             }
         ).apply { start() }
+
+        voiceAnnouncer?.attachAudioPlayer(audioPlayer)
 
         serviceScope.launch(Dispatchers.IO) {
             val systemPrompt = generateCurrentSystemPrompt()
@@ -1303,13 +1301,10 @@ class JarvisConversationService : Service() {
                                         if (!wakeGreetingAudioReceived && _isSessionOn.value &&
                                             audioPlayer?.isPlaying() != true
                                         ) {
-                                            Log.i("JarvisService", "Wake greeting fallback via local TTS")
-                                            tts?.speak(
-                                                wakeGreeting,
-                                                TextToSpeech.QUEUE_FLUSH,
-                                                null,
-                                                "wake_greeting"
-                                            )
+                                            Log.i("JarvisService", "Wake greeting fallback via announcer")
+                                            voiceAnnouncer?.speak(wakeGreeting, "wake_greeting") {
+                                                handleAnnouncementDone("wake_greeting")
+                                            }
                                         }
                                     }
                                 }
@@ -1342,13 +1337,10 @@ class JarvisConversationService : Service() {
                                         if (!wakeGreetingAudioReceived && _isSessionOn.value &&
                                             audioPlayer?.isPlaying() != true
                                         ) {
-                                            Log.i("JarvisService", "Persona greeting fallback via local TTS")
-                                            tts?.speak(
-                                                greeting,
-                                                TextToSpeech.QUEUE_FLUSH,
-                                                null,
-                                                "persona_greeting"
-                                            )
+                                            Log.i("JarvisService", "Persona greeting fallback via announcer")
+                                            voiceAnnouncer?.speak(greeting, "persona_greeting") {
+                                                handleAnnouncementDone("persona_greeting")
+                                            }
                                         }
                                     }
                                 }
@@ -1649,8 +1641,10 @@ class JarvisConversationService : Service() {
                                 lastCompletedTaskSummary = null
                                 val isLive = liveWebSocket?.isSessionReady() == true
                                 if (!preferences.isSilentExecutionMode && !isLive) {
-                                    Log.i("JarvisService", "Offline fallback: Speaking confirmation via TTS: '$summaryToSpeak'")
-                                    tts?.speak(summaryToSpeak, TextToSpeech.QUEUE_FLUSH, null, "task_done")
+                                    Log.i("JarvisService", "Offline fallback: Speaking confirmation via announcer: '$summaryToSpeak'")
+                                    voiceAnnouncer?.speak(summaryToSpeak.orEmpty(), "task_done") {
+                                        handleAnnouncementDone("task_done")
+                                    }
                                 }
                             }
 
@@ -1707,7 +1701,7 @@ class JarvisConversationService : Service() {
                                                 Log.i("JarvisService", "Auto-resume cancelled because the task/session changed or the user spoke")
                                                 return@launch
                                             }
-                                            val playbackActive = audioPlayer?.isPlaying() == true || tts?.isSpeaking == true ||
+                                            val playbackActive = audioPlayer?.isPlaying() == true || voiceAnnouncer?.isSpeaking() == true ||
                                                 _conversationState.value == ConversationState.SPEAKING
                                             if (playbackActive) {
                                                 quietSince = 0L
@@ -1879,10 +1873,15 @@ class JarvisConversationService : Service() {
                 }
 
                 // Assistant is speaking / AudioTrack or TTS is actively playing:
-                val isSpeakerActive = (audioPlayer?.isPlaying() == true) || (tts?.isSpeaking == true) ||
+                val isSpeakerActive = (audioPlayer?.isPlaying() == true) || (voiceAnnouncer?.isSpeaking() == true) ||
                         (_conversationState.value == ConversationState.SPEAKING)
 
                 if (isSpeakerActive) {
+                    // Keep a bounded analysis copy of what the mic heard during playback. It is
+                    // never streamed; it is only used to confirm the barge-in speaker.
+                    synchronized(bargeInAudio) {
+                        if (bargeInAudio.size() < 40_000) bargeInAudio.write(chunk)
+                    }
                     // Barge-in works on speaker and headset. The recorder already has
                     // hardware AEC + noise suppression, so require the user's voice to
                     // clearly beat BOTH the room's adaptive noise floor AND the residual
@@ -1913,38 +1912,67 @@ class JarvisConversationService : Service() {
                     )
                     if (graceElapsed && amplitude > echoFloor) {
                         consecutiveVoicedFrames++
-                        if (consecutiveVoicedFrames >= minFrames) {
-                            Log.i(
-                                "JarvisService",
-                                "Voice barge-in: sustained speech over assistant (amp=$amplitude, " +
-                                    "floor=$echoFloor, frames=$consecutiveVoicedFrames, mode=$interruptSensitivity)"
+                        val action = com.jarvis.assistant.audio.BargeInPolicy.decide(
+                            com.jarvis.assistant.audio.BargeInPolicy.Snapshot(
+                                ownerVerificationRequired = ownerVerificationRequired(),
+                                ownerAlreadyVerified = isCurrentTurnOwnerVoiceVerified,
+                                graceElapsed = graceElapsed,
+                                amplitude = amplitude,
+                                echoFloor = echoFloor,
+                                highPassRms = com.jarvis.assistant.audio.AudioFilters.highPassRms16k(chunk),
+                                consecutiveVoicedFrames = consecutiveVoicedFrames,
+                                minFrames = minFrames,
+                                verificationInFlight = bargeInVerificationInFlight,
+                                rejectedRecently = now - lastBargeInRejectedAt < 3_000L
                             )
-                            isBargingIn = true
-                            audioPlayer?.flush()
-                            try { tts?.stop() } catch (_: Exception) {}
-                            setConversationState(ConversationState.LISTENING)
-                            lastUserSpeechDetectedTime = now
-                            hasSpeechInCurrentUtterance = true
-                            hasSignalledUtteranceEnd = false
-                            currentTurnUserText.clear()
-                            currentTurnAssistantText.clear()
-                            _liveUserTranscript.value = ""
-                            _liveAssistantResponse.value = ""
-                            hasExecutedCommandInCurrentTurn = false
-                            totalVoicedFramesInCurrentUtterance = minFrames
-                            synchronized(currentUtteranceAudioStream) {
-                                currentUtteranceAudioStream.reset()
-                                currentUtteranceAudioStream.write(chunk)
+                        )
+                        when (action) {
+                            com.jarvis.assistant.audio.BargeInPolicy.Action.INTERRUPT -> {
+                                beginBargeIn(chunk, now, minFrames)
+                                return@AudioRecorder
                             }
-                            isCurrentTurnOwnerVoiceVerified =
-                                !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()
-                            voiceGateOpen = !ownerVerificationRequired()
-                            synchronized(voiceGateBuffer) { voiceGateBuffer.clear() }
-                            serviceScope.launch {
-                                delay(700L)
-                                isBargingIn = false
+                            com.jarvis.assistant.audio.BargeInPolicy.Action.VERIFY -> {
+                                bargeInVerificationInFlight = true
+                                val snapshot = synchronized(bargeInAudio) { bargeInAudio.toByteArray() }
+                                serviceScope.launch(Dispatchers.Default) {
+                                    val match = if (snapshot.size >= com.jarvis.assistant.audio.SherpaVoiceprint.MIN_BYTES) {
+                                        com.jarvis.assistant.audio.OwnerVoiceManager.verifySpeakerAudio(snapshot, preferences)
+                                    } else {
+                                        null
+                                    }
+                                    val allow = match != null && com.jarvis.assistant.audio.BargeInPolicy
+                                        .verificationAllowsInterrupt(match.isMatch, match.hasExtractedVector)
+                                    withContext(Dispatchers.Main) {
+                                        bargeInVerificationInFlight = false
+                                        val stillSpeaking = audioPlayer?.isPlaying() == true ||
+                                            _conversationState.value == ConversationState.SPEAKING
+                                        if (allow && stillSpeaking && _isSessionOn.value) {
+                                            Log.i(
+                                                "JarvisService",
+                                                "Barge-in owner verified (dist=${match?.distance}, " +
+                                                    "sim=${match?.similarityPercent}%)."
+                                            )
+                                            beginBargeIn(chunk, System.currentTimeMillis(), minFrames)
+                                        } else {
+                                            lastBargeInRejectedAt = System.currentTimeMillis()
+                                            consecutiveVoicedFrames = 0
+                                            synchronized(bargeInAudio) { bargeInAudio.reset() }
+                                            Log.i(
+                                                "JarvisService",
+                                                "Barge-in ignored: speaker not verified " +
+                                                    "(hasVector=${match?.hasExtractedVector})."
+                                            )
+                                        }
+                                    }
+                                }
+                                return@AudioRecorder
                             }
-                            return@AudioRecorder
+                            com.jarvis.assistant.audio.BargeInPolicy.Action.IGNORE -> {
+                                // Below the sustained/echo/high-pass bar; keep accumulating.
+                                if (consecutiveVoicedFrames < minFrames) {
+                                    // fall through to the return below
+                                }
+                            }
                         }
                     } else {
                         consecutiveVoicedFrames = 0
@@ -1952,6 +1980,12 @@ class JarvisConversationService : Service() {
                     // While the assistant is physically speaking, don't stream raw mic
                     // audio to Gemini; the barge-in path above starts the new turn.
                     return@AudioRecorder
+                }
+
+                // Speaker is silent again: the analysis buffer is only meaningful for the
+                // current playback, so drop it instead of growing across turns.
+                synchronized(bargeInAudio) {
+                    if (bargeInAudio.size() > 0) bargeInAudio.reset()
                 }
 
                 // Stream user speech to Gemini Live.
@@ -2975,7 +3009,7 @@ class JarvisConversationService : Service() {
                                 if (!alreadySpoke && liveWebSocket?.isSessionReady() != true) {
                                     // Offline fallback: speak via TTS only when Gemini Live is offline
                                     lastCompletedTaskSummary = null
-                                    tts?.speak(summary, TextToSpeech.QUEUE_FLUSH, null, "task_done")
+                                    voiceAnnouncer?.speak(summary, "task_done") { handleAnnouncementDone("task_done") }
                                 } else if (!alreadySpoke) {
                                     // Gemini may finish the tool loop silently; guarantee one update.
                                     ensureSpokenUpdate("Task complete ho gaya sir. $summary", 3_500L)
@@ -3846,6 +3880,8 @@ class JarvisConversationService : Service() {
         audioPlayer?.release()
         audioPlayer = null
 
+        voiceAnnouncer?.attachAudioPlayer(null)
+
         liveWebSocket?.disconnect()
         liveWebSocket = null
 
@@ -4225,6 +4261,41 @@ class JarvisConversationService : Service() {
 
     private var currentFocusRequest: Any? = null
 
+    /**
+     * Commits a verified barge-in: stops Jarvis's own playback and starts a fresh listening
+     * turn with the interrupting audio. Runs on the audio thread for an already-verified
+     * owner, or on Main after an asynchronous speaker match.
+     */
+    private fun beginBargeIn(chunk: ByteArray, now: Long, minFrames: Int) {
+        Log.i("JarvisService", "Voice barge-in accepted (minFrames=$minFrames)")
+        isBargingIn = true
+        audioPlayer?.flush()
+        voiceAnnouncer?.stop()
+        setConversationState(ConversationState.LISTENING)
+        lastUserSpeechDetectedTime = now
+        hasSpeechInCurrentUtterance = true
+        hasSignalledUtteranceEnd = false
+        currentTurnUserText.clear()
+        currentTurnAssistantText.clear()
+        _liveUserTranscript.value = ""
+        _liveAssistantResponse.value = ""
+        hasExecutedCommandInCurrentTurn = false
+        totalVoicedFramesInCurrentUtterance = minFrames
+        synchronized(currentUtteranceAudioStream) {
+            currentUtteranceAudioStream.reset()
+            currentUtteranceAudioStream.write(chunk)
+        }
+        isCurrentTurnOwnerVoiceVerified =
+            !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()
+        voiceGateOpen = !ownerVerificationRequired()
+        synchronized(voiceGateBuffer) { voiceGateBuffer.clear() }
+        synchronized(bargeInAudio) { bargeInAudio.reset() }
+        serviceScope.launch {
+            delay(700L)
+            isBargingIn = false
+        }
+    }
+
     private fun requestAudioDuckFocus() {
         try {
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
@@ -4278,33 +4349,63 @@ class JarvisConversationService : Service() {
         cancelStandbyIdleRelease()
 
         // Stage 2 — verify the wake utterance itself before activating. The detector only
-        // says "someone said the wake word"; this check says "it was the owner". On a
-        // mismatch (or when verification is on but nobody enrolled) Jarvis never activates
-        // and no audio is forwarded to Gemini.
+        // says "someone said the wake word"; this check says "it was the owner". A definite
+        // mismatch stops activation. If verification cannot be performed (no profile, model
+        // still warming up, or too little audio) we fail OPEN and let the streaming gate
+        // verify the actual command audio instead of killing the wake word.
         if (preferences.isOwnerVoiceEnabled) {
-            if (!preferences.hasOwnerVoiceProfile()) {
-                Log.w("JarvisService", "Wake heard but no owner voice profile is enrolled; prompting to enroll.")
-                announceOwnerEnrollmentNeeded()
-                return
-            }
             val pcm = wakeEngine?.recentPcm()
-            if (pcm == null || pcm.isEmpty()) {
-                Log.w("JarvisService", "Wake rejected: no wake-utterance audio available for verification.")
-                return
+            val hasAudio = pcm != null && pcm.isNotEmpty()
+            val match = if (hasAudio) {
+                com.jarvis.assistant.audio.OwnerVoiceManager.verifySpeakerAudio(pcm!!, preferences)
+            } else {
+                null
             }
-            val match = com.jarvis.assistant.audio.OwnerVoiceManager.verifySpeakerAudio(pcm, preferences)
-            if (!match.isMatch) {
+            val decision = com.jarvis.assistant.audio.WakeActivationPolicy.decide(
+                ownerVerificationEnabled = true,
+                hasProfile = preferences.hasOwnerVoiceProfile(),
+                hasAudio = hasAudio,
+                extractedVector = match?.hasExtractedVector == true,
+                isMatch = match?.isMatch == true
+            )
+            if (decision.promptEnrollment &&
+                com.jarvis.assistant.audio.WakeActivationPolicy.shouldPromptEnrollment(
+                    preferences.voiceEnrollPromptAt,
+                    now
+                )
+            ) {
+                preferences.voiceEnrollPromptAt = now
+                Log.i("JarvisService", "Wake heard but no owner profile; activating and prompting enrollment.")
+                announceOwnerEnrollmentNeeded()
+            }
+            if (!decision.activate) {
                 Log.w(
                     "JarvisService",
-                    "Wake rejected: speaker is not the owner (dist=${match.distance}, " +
-                        "hasVector=${match.hasExtractedVector}, thr=${match.threshold}). Ignored."
+                    "Wake rejected: speaker is not the owner (dist=${match?.distance}, " +
+                        "hasVector=${match?.hasExtractedVector}, thr=${match?.threshold}). Ignored."
                 )
                 return
             }
-            lastOwnerVerifiedTimestamp = now
-            isCurrentTurnOwnerVoiceVerified = true
-            ownerVerificationInconclusive = false
-            Log.i("JarvisService", "Wake verified: owner confirmed (dist=${match.distance}, sim=${match.similarityPercent}%).")
+            if (decision.verifiedOwner) {
+                lastOwnerVerifiedTimestamp = now
+                isCurrentTurnOwnerVoiceVerified = true
+                ownerVerificationInconclusive = false
+                lastWakeOwnerVerified = true
+                Log.i(
+                    "JarvisService",
+                    "Wake verified: owner confirmed (dist=${match?.distance}, sim=${match?.similarityPercent}%)."
+                )
+            } else {
+                // Fail-open: let the per-utterance streaming gate decide on the command audio.
+                lastWakeOwnerVerified = false
+                Log.i(
+                    "JarvisService",
+                    "Wake verification inconclusive (hasAudio=$hasAudio, " +
+                        "hasVector=${match?.hasExtractedVector}); continuing with command-audio verification."
+                )
+            }
+        } else {
+            lastWakeOwnerVerified = false
         }
 
         // Verification is heavy; standby may have been left underneath us. Bail out quietly so a
@@ -4365,7 +4466,7 @@ class JarvisConversationService : Service() {
             else -> "Pehle apni awaaz enroll karo. Settings me Voice section kholo."
         }
         try {
-            tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, "voice_enroll_needed")
+            voiceAnnouncer?.speak(message, "voice_enroll_needed")
         } catch (_: Throwable) {
         }
         serviceScope.launch { _events.emit("Voice enrollment needed") }
@@ -4445,11 +4546,8 @@ class JarvisConversationService : Service() {
         shakeDetector = null
         stopActiveConversation()
         exitStandbyListening()
-        try {
-            tts?.stop()
-            tts?.shutdown()
-        } catch (_: Exception) {}
-        tts = null
+        voiceAnnouncer?.shutdown()
+        voiceAnnouncer = null
         stopWakeEngine()
         releaseWakeLock()
         serviceScope.cancel()
@@ -4540,7 +4638,7 @@ class JarvisConversationService : Service() {
 
             // A ringing call takes priority over whatever the assistant was saying.
             audioPlayer?.flush()
-            try { tts?.stop() } catch (_: Throwable) {}
+            voiceAnnouncer?.stop()
 
             if (_isSessionOn.value) {
                 liveWebSocket?.sendClientContent(
@@ -4550,9 +4648,9 @@ class JarvisConversationService : Service() {
                 )
             } else {
                 try {
-                    tts?.speak(question, TextToSpeech.QUEUE_FLUSH, null, "incoming_call")
+                    voiceAnnouncer?.speak(question, "incoming_call") { handleAnnouncementDone("incoming_call") }
                 } catch (t: Throwable) {
-                    Log.w("JarvisService", "Call announcement TTS failed: ${t.message}")
+                    Log.w("JarvisService", "Call announcement failed: ${t.message}")
                 }
             }
         }
@@ -4616,7 +4714,7 @@ class JarvisConversationService : Service() {
                 )
             } else {
                 try {
-                    tts?.speak(confirmation, TextToSpeech.QUEUE_FLUSH, null, "call_decision")
+                    voiceAnnouncer?.speak(confirmation, "call_decision") { handleAnnouncementDone("call_decision") }
                 } catch (_: Throwable) {
                 }
             }

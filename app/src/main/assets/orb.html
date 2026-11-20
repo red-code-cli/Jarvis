@@ -183,6 +183,45 @@ const THEMES={
  isha:{bg:"radial-gradient(120% 80% at 50% 35%,#2b0a1e 0%,#170510 60%,#060204 100%)",fg:"#ffe8f4",sub:"#d59ab8",glass:"rgba(255,255,255,.08)",gb:"rgba(255,140,200,.22)",chip:"#f5b8d8",t:["#ff5fa2","#ff2d8d","#ff9ecb"],add:true,sh:"rgba(255,60,150,.24)",pal:[[.55,.05,.30],[.95,.20,.58],[1,.48,.76],[.95,.68,.88]]},
  sunset:{bg:"radial-gradient(120% 80% at 50% 35%,#fff6ef 0%,#ffe7e1 60%,#fbd8e8 100%)",fg:"#4a2340",sub:"#98677f",glass:"rgba(255,255,255,.6)",gb:"rgba(255,255,255,.85)",chip:"#7a4566",t:["#ff6a3d","#e83e8c","#8b5cf6"],add:false,sh:"rgba(170,70,110,.22)",pal:[[.55,.12,.45],[.95,.30,.45],[1,.55,.20],[.60,.30,.90]]}
 };
+
+/* ---------- Orb styles (animation character + hue bias) ---------- */
+const STYLES={
+  holographic_plasma:{hue:0,speed:1,glow:1,ring:1,wob:0,scale:1},
+  aurora_borealis:{hue:.33,speed:.9,glow:1.3,ring:.7,scale:1.02},
+  cosmic_nebula:{hue:.78,speed:.8,glow:1.5,ring:1.2,wob:.15},
+  solar_flare:{hue:.08,speed:1.3,glow:1.6,ring:.8},
+  ember_glow:{hue:.07,speed:.75,glow:1.4,ring:.6},
+  arctic_ice:{hue:.55,speed:.85,glow:1.1,ring:.5},
+  deep_ocean:{hue:.57,speed:.6,glow:.9,ring:.4},
+  violet_nights:{hue:.72,speed:.7,glow:1,ring:.6},
+  toxic_waste:{hue:.28,speed:1.05,glow:1.3,ring:.9},
+  candy_pop:{hue:.88,speed:1.1,glow:1.2,ring:1.1},
+  gold_rush:{hue:.12,speed:.95,glow:1.35,ring:.7},
+  silver_linings:{hue:.6,speed:.7,glow:.8,ring:.4},
+  rose_quartz:{hue:.94,speed:.8,glow:1.1,ring:.7},
+  twilight_ombre:{hue:.82,speed:.9,glow:1.25,ring:.9},
+  midnight_sky:{hue:.68,speed:.5,glow:.7,ring:.3},
+  blood_moon:{hue:.02,speed:.85,glow:1.4,ring:.8},
+  ultraviolet:{hue:.74,speed:1,glow:1.3,ring:1},
+  infrared:{hue:.98,speed:1,glow:1.3,ring:.9},
+  matrix_rain:{hue:.3,speed:1.2,glow:1.15,ring:.8},
+  synthwave_sun:{hue:.85,speed:1.1,glow:1.4,ring:1},
+  forest_spirit:{hue:.34,speed:.75,glow:1.15,ring:.6},
+  desert_storm:{hue:.1,speed:.9,glow:1.1,ring:.7,wob:.1},
+  volcanic_hellfire:{hue:.03,speed:.95,glow:1.5,ring:.85},
+  frost_aura:{hue:.56,speed:.65,glow:.95,ring:.45},
+  electric_storm:{hue:.6,speed:1.5,glow:1.6,ring:1.3,wob:.2},
+  steampunk_copper:{hue:.09,speed:.8,glow:1.2,ring:.8},
+  iridescent:{hue:.05,speed:1.2,glow:1.3,ring:1.1,wob:.15},
+  monochrome_shadow:{hue:0,speed:.6,glow:.6,ring:.3,scale:.98},
+  glitch_core:{hue:.5,speed:1.4,glow:1.4,ring:1.2,wob:.25},
+  dreamlike_pastel:{hue:.9,speed:.7,glow:1.2,ring:.8},
+  bio_luminescent:{hue:.36,speed:.8,glow:1.35,ring:.7},
+  supernova:{hue:.65,speed:1.4,glow:2,ring:1.4,scale:1.05}
+};
+let orbStyle="holographic_plasma";
+function styleParams(){return STYLES[orbStyle]||STYLES.holographic_plasma;}
+function setStyle(n){if(!STYLES[n])return;orbStyle=n;applyTheme(themeName,userCustom);}
 let themeName="light";
 let userThemeName="light",userCustom=null,personaName="jarvis";
 function setBlend(add){
@@ -199,7 +238,7 @@ function applyTheme(name,custom){
     if(hsl.s<.06){
       pal=light?LIGHTPAL:[[.10,.20,.80],[.25,.50,1],[.30,.92,1],[.70,.45,1]];
     }else{
-      const h=hsl.h;
+      const h=(hsl.h+styleParams().hue)%1;
       const cDeep=new THREE.Color().setHSL(h,Math.min(1,Math.max(.6,hsl.s*1.2)),Math.max(.1,Math.min(.35,hsl.l*.45)));
       const cMain=new THREE.Color().setHSL(h,Math.max(.85,hsl.s),Math.max(.45,Math.min(.65,hsl.l)));
       const cAcc1=new THREE.Color().setHSL((h+.08)%1.,.95,.65);
@@ -266,9 +305,12 @@ function setOrbPersona(p){
 }
 let state="idle";
 const cur=Object.assign({},STATES.idle),tgt=Object.assign({},STATES.idle);
+const reducedMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
 function setOrbState(s){
   if(!STATES[s]) return;
-  state=s;Object.assign(tgt,STATES[s]);
+  state=s;
+  const st=styleParams(),b=STATES[s],rm=reducedMotion?0.35:1;
+  Object.assign(tgt,{scale:b.scale*st.scale,speed:b.speed*st.speed*rm,cyan:b.cyan,purple:b.purple,bright:b.bright,glow:b.glow*st.glow,ring:b.ring*st.ring,wob:Math.min(1,b.wob+st.wob)});
   const lbl = $("#stext");
   if(lbl) lbl.textContent=LABELS[s] || "READY";
   document.querySelectorAll("[data-s]").forEach(b=>b.classList.toggle("on",b.dataset.s===s));
@@ -409,6 +451,7 @@ window.JarvisOrb={
   setState:setOrbState,
   setTheme:n=>setOrbTheme(n),
   setPersona:setOrbPersona,
+  setStyle:setStyle,
   setBackground:hex=>{
     if(!isEmbedded) document.documentElement.style.setProperty("--bg",hex);
     setOrbTheme("custom",hex);

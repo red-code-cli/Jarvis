@@ -46,6 +46,11 @@ class JarvisNotificationListenerService : NotificationListenerService() {
                 .filter { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 }
                 .filter { it.packageName != service.packageName }
                 .filter { sbn ->
+                    // Per-app deny policy: the owner blocked this app from being read aloud.
+                    !com.jarvis.assistant.JarvisApp.instance.preferences
+                        .isNotificationPackageDenied(sbn.packageName)
+                }
+                .filter { sbn ->
                     when {
                         filter.contains("whatsapp") ->
                             sbn.packageName.contains("whatsapp", ignoreCase = true)
@@ -73,6 +78,9 @@ class JarvisNotificationListenerService : NotificationListenerService() {
                         ?: extras.getCharSequence(Notification.EXTRA_SUB_TEXT)
                     )?.toString()?.trim().orEmpty()
                 if (title.isBlank() && body.isBlank()) continue
+                // Never read out OTP / bank / password content, and never log it.
+                if (NotificationPolicy.isSensitive("$title ${body.take(400)}")) continue
+                com.jarvis.assistant.JarvisApp.instance.preferences.addNotificationSeenPackage(sbn.packageName)
 
                 var sender = title.ifBlank { "Unknown" }
                 val conversation = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)

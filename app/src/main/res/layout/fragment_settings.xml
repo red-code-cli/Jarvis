@@ -715,6 +715,80 @@
         </LinearLayout>
 
         <!-- Background Noise Filter -->
+        <!-- Advanced voice & phone controls (collapsible) -->
+        <LinearLayout
+            android:id="@+id/cardVoicePhoneAdvanced"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_ref_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <LinearLayout
+                android:id="@+id/voicePhoneAdvancedHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingBottom="8dp">
+
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_ref_row_icon">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="Advanced voice phone"
+                        android:src="@drawable/ic_settings_voice"
+                        app:tint="?attr/themeAccent" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Advanced voice &amp; phone controls"
+                        android:textColor="?attr/themeTextPrimary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Noise filter, call control, messages reader, shake-to-talk"
+                        android:textColor="?attr/themeTextMuted"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/imgVoicePhoneAdvancedChevron"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="Expand advanced controls"
+                    android:src="@drawable/ic_arrow_right"
+                    app:tint="?attr/themeTextMuted" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/voicePhoneAdvancedContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+        <!-- Background Noise Filter -->
         <LinearLayout
             android:id="@+id/rowNoiseFilter"
             android:layout_width="match_parent"
@@ -770,7 +844,6 @@
                 android:layout_marginStart="8dp"
                 app:useMaterialThemeColors="true" />
         </LinearLayout>
-
         <!-- Voice Call Answering (Pick / Cut hands-free) -->
         <LinearLayout
             android:id="@+id/rowVoiceCallAnswering"
@@ -827,7 +900,6 @@
                 android:layout_marginStart="8dp"
                 app:useMaterialThemeColors="true" />
         </LinearLayout>
-
         <!-- Unread Messages Voice Reader -->
         <LinearLayout
             android:id="@+id/rowUnreadMessages"
@@ -884,7 +956,65 @@
                 android:layout_marginStart="8dp"
                 app:useMaterialThemeColors="true" />
         </LinearLayout>
+        <!-- Per-app notification control -->
+        <LinearLayout
+            android:id="@+id/rowNotificationApps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp"
+            android:clickable="true"
+            android:focusable="true">
 
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Notification app control"
+                    android:src="@drawable/ic_settings_shield"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="App-level notification control"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Chuno ki kaunse apps ki notifications sunni hain"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Open app list"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
         <!-- Shake to Talk -->
         <LinearLayout
             android:id="@+id/rowShakeToTalk"
@@ -941,6 +1071,10 @@
                 android:layout_marginStart="8dp"
                 app:useMaterialThemeColors="true" />
         </LinearLayout>
+
+            </LinearLayout>
+        </LinearLayout>
+
 
         <!-- API connection -->
         <LinearLayout

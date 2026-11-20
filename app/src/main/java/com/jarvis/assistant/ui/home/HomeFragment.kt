@@ -50,6 +50,7 @@ class HomeFragment : Fragment() {
     private var pendingThemeKey: String? = null
     private var pendingCustomHex: String? = null
     private var pendingPersonaKey: String? = null
+    private var pendingOrbStyle: String? = null
     private var lastAudioPushTime = 0L
     private var taskFallbackPanel: android.widget.LinearLayout? = null
     private var taskFallbackText: android.widget.TextView? = null
@@ -146,24 +147,6 @@ class HomeFragment : Fragment() {
                 id,
             )
         }
-        binding.btnAgentLivePause.setOnClickListener {
-            val id = harnessLive?.taskId ?: return@setOnClickListener
-            val engine = com.jarvis.assistant.harness.JarvisHarnessBridge.engine(requireContext())
-            val live = harnessLive
-            val failed = live?.phase == com.jarvis.harness.HarnessLiveStatus.Phase.ERROR
-            if (failed || live?.state == "PAUSED" || live?.state == "INTERRUPTED") {
-                engine.resumeTask(id)
-            } else {
-                engine.pauseTask(id)
-            }
-        }
-        binding.btnAgentLiveStop.setOnClickListener {
-            com.jarvis.assistant.harness.JarvisHarnessBridge.requestCancel(requireContext())
-        }
-        binding.btnAgentLivePreview.setOnClickListener {
-            val url = harnessLive?.previewUrl ?: return@setOnClickListener
-            com.jarvis.assistant.harness.JarvisHarnessBridge.openPreview(requireContext(), url)
-        }
     }
 
     private fun sendHomeInput() {
@@ -200,6 +183,7 @@ class HomeFragment : Fragment() {
                     val customHex = pendingCustomHex ?: preferences.customThemeColor
                     setOrbTheme(currentTheme, customHex)
                     setOrbPersona(pendingPersonaKey ?: preferences.personality)
+                    setOrbStyle(pendingOrbStyle ?: preferences.orbAnimation)
 
                     val state = pendingOrbState ?: when (viewModel.conversationState.value) {
                         ConversationState.LISTENING -> "listening"
@@ -249,15 +233,10 @@ class HomeFragment : Fragment() {
         if (!isPageLoaded) return
         activity?.runOnUiThread {
             val webView = _binding?.orbWebView ?: return@runOnUiThread
-            if (themeKey == "custom" && !customHex.isNullOrBlank()) {
+            if (themeKey == com.jarvis.assistant.util.ThemeRegistry.CUSTOM_KEY && !customHex.isNullOrBlank()) {
                 webView.evaluateJavascript("window.JarvisOrb && window.JarvisOrb.setBackground('$customHex');", null)
             } else {
-                val mapped = when (themeKey) {
-                    "dark" -> "dark"
-                    "red" -> "red"
-                    "sunset" -> "sunset"
-                    else -> "light"
-                }
+                val mapped = com.jarvis.assistant.util.ThemeRegistry.byKey(themeKey)?.orbTheme ?: "light"
                 webView.evaluateJavascript("window.JarvisOrb && window.JarvisOrb.setTheme('$mapped');", null)
             }
         }
@@ -283,6 +262,18 @@ class HomeFragment : Fragment() {
         activity?.runOnUiThread {
             _binding?.orbWebView?.evaluateJavascript(
                 "window.JarvisOrb && window.JarvisOrb.setPersona('$mapped');",
+                null
+            )
+        }
+    }
+
+    fun setOrbStyle(styleKey: String?) {
+        val key = com.jarvis.assistant.util.OrbStyleRegistry.byKey(styleKey)?.key ?: com.jarvis.assistant.util.OrbStyleRegistry.DEFAULT_STYLE
+        pendingOrbStyle = key
+        if (!isPageLoaded) return
+        activity?.runOnUiThread {
+            _binding?.orbWebView?.evaluateJavascript(
+                "window.JarvisOrb && window.JarvisOrb.setStyle('$key');",
                 null
             )
         }
@@ -336,6 +327,7 @@ class HomeFragment : Fragment() {
         renderTaskFallback(com.jarvis.assistant.automation.agent.AgentTaskEngine.taskState.value)
         setOrbTheme(preferences.appTheme, preferences.customThemeColor)
         setOrbPersona(preferences.personality)
+        setOrbStyle(preferences.orbAnimation)
         updateGreeting()
         updateDateCard()
         updateBatteryCard(requireContext().registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
@@ -358,6 +350,7 @@ class HomeFragment : Fragment() {
             com.jarvis.assistant.util.ThemeManager.applyDynamicBackground(binding.root)
             setOrbTheme(preferences.appTheme, preferences.customThemeColor)
             setOrbPersona(preferences.personality)
+            setOrbStyle(preferences.orbAnimation)
             updateGreeting()
             updateDateCard()
         } else {
@@ -589,9 +582,6 @@ class HomeFragment : Fragment() {
             b.tvAgentLiveChip.visibility = View.GONE
             b.tvAgentLiveQueued.visibility = View.GONE
             b.pbAgentLive.visibility = View.GONE
-            b.layoutAgentLiveFeed.visibility = View.GONE
-            b.layoutAgentLiveActions.visibility = View.GONE
-            b.btnAgentLivePreview.visibility = View.GONE
             return
         }
 
@@ -610,7 +600,6 @@ class HomeFragment : Fragment() {
             append("Step ").append(live.step)
             append(" · ").append(live.files).append(" files")
             if (live.budget.isNotBlank()) append(" · ").append(live.budget)
-            if (live.line.isNotBlank()) append(" · ").append(live.line.take(80))
         }
         b.tvAgentLiveChip.text = label
         b.tvAgentLiveChip.setTextColor(Color.parseColor(color))
@@ -629,68 +618,6 @@ class HomeFragment : Fragment() {
             b.pbAgentLive.progress = progress
             b.pbAgentLive.visibility = View.VISIBLE
         }
-
-        // Last 5 live lines; errors in red, new lines fade in from the bottom.
-        b.layoutAgentLiveFeed.removeAllViews()
-        val feedLines = live.feed.takeLast(5)
-        val breakdownLine: List<com.jarvis.harness.HarnessLiveLine> = if (live.breakdown.isNotBlank()) {
-            listOf(com.jarvis.harness.HarnessLiveLine(0L, "BREAKDOWN", "\u03A3 " + live.breakdown))
-        } else {
-            emptyList()
-        }
-        val lines = breakdownLine + feedLines
-        b.layoutAgentLiveFeed.visibility = if (lines.isEmpty()) View.GONE else View.VISIBLE
-        lines.forEachIndexed { index, line ->
-            val row = android.widget.TextView(requireContext()).apply {
-                text = buildString {
-                    append(glyphFor(line.kind))
-                    append("  ")
-                    append(line.text)
-                }
-                setTextColor(
-                    when {
-                        line.isError || line.kind == "ERROR" -> Color.parseColor("#FF6B6B")
-                        line.kind == "COMPLETED" -> Color.parseColor("#39D98A")
-                        line.kind == "BASH_COMMAND" -> Color.parseColor("#C8B6FF")
-                        line.kind == "FILE_WRITE" || line.kind == "FILE_EDIT" -> Color.parseColor("#7FE7FF")
-                        else -> Color.parseColor("#9AA1AC")
-                    }
-                )
-                textSize = 11f
-                maxLines = 2
-                ellipsize = android.text.TextUtils.TruncateAt.END
-                setPadding(0, 3, 0, 3)
-                alpha = if (index == lines.lastIndex) 0f else 1f
-                animate().alpha(1f).setDuration(220).start()
-            }
-            b.layoutAgentLiveFeed.addView(row)
-        }
-
-        b.layoutAgentLiveActions.visibility = View.VISIBLE
-        val pausedOrInterrupted = live.state == "PAUSED" || live.state == "INTERRUPTED"
-        val failed = phase == com.jarvis.harness.HarnessLiveStatus.Phase.ERROR
-        val done = phase == com.jarvis.harness.HarnessLiveStatus.Phase.SUCCESS
-        b.btnAgentLivePause.visibility = if (done) View.GONE else View.VISIBLE
-        b.btnAgentLiveStop.visibility = if (done || failed) View.GONE else View.VISIBLE
-        b.btnAgentLivePause.text = when {
-            failed -> "RETRY"
-            pausedOrInterrupted -> "CONTINUE"
-            else -> "PAUSE"
-        }
-        b.btnAgentLivePreview.visibility = if (live.previewUrl.isNullOrBlank()) View.GONE else View.VISIBLE
-    }
-
-    private fun glyphFor(kind: String): String = when (kind) {
-        "FILE_WRITE" -> "✎"
-        "FILE_EDIT" -> "✱"
-        "BASH_COMMAND" -> "$"
-        "STEP_DONE" -> "✓"
-        "ERROR" -> "✕"
-        "RETRY" -> "↻"
-        "PAUSED" -> "❚❚"
-        "RESUMED" -> "▶"
-        "COMPLETED" -> "★"
-        else -> "·"
     }
 
     private fun renderHomeStatus(status: HomeStatusState) {
@@ -864,7 +791,8 @@ class HomeFragment : Fragment() {
             startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
             endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
             topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
-            topMargin = dp(92)
+            // Below the greeting + orb block so it never covers the header.
+            topMargin = dp(306)
             marginStart = dp(18)
             marginEnd = dp(18)
         }

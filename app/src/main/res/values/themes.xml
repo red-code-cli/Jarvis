@@ -239,12 +239,401 @@
         <item name="themeAccentLight">#1E2858</item>
     </style>
 
+
+    <!-- pearl -->
+    <style name="Theme.JarvisAssistant.PearlWhite" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#F4F6FB</item>
+        <item name="android:navigationBarColor">#E9EEF8</item>
+        <item name="android:windowBackground">#F4F6FB</item>
+        <item name="themeBg">#F4F6FB</item>
+        <item name="themeAccent">#4F7FF0</item>
+        <item name="themeAccent1">#8FB4FF</item>
+        <item name="themeAccent2">#7C6CF0</item>
+        <item name="themeAccent3">#28C7E6</item>
+        <item name="themeAccentLight">#DCE9FF</item>
+    </style>
+
+    <!-- snow -->
+    <style name="Theme.JarvisAssistant.Snow" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:navigationBarColor">#EDF1F8</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="themeBg">#FFFFFF</item>
+        <item name="themeAccent">#2F8DF6</item>
+        <item name="themeAccent1">#62B8FF</item>
+        <item name="themeAccent2">#7C6CF0</item>
+        <item name="themeAccent3">#28C7E6</item>
+        <item name="themeAccentLight">#D8E9FF</item>
+    </style>
+
+    <!-- lavender -->
+    <style name="Theme.JarvisAssistant.Lavender" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#F3F0FB</item>
+        <item name="android:navigationBarColor">#E4DFF5</item>
+        <item name="android:windowBackground">#F3F0FB</item>
+        <item name="themeBg">#F3F0FB</item>
+        <item name="themeAccent">#8B5CF6</item>
+        <item name="themeAccent1">#A78BFA</item>
+        <item name="themeAccent2">#C084FC</item>
+        <item name="themeAccent3">#F472B6</item>
+        <item name="themeAccentLight">#EDE4FF</item>
+    </style>
+
+    <!-- blush -->
+    <style name="Theme.JarvisAssistant.Blush" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#FDF0F5</item>
+        <item name="android:navigationBarColor">#F8E0EA</item>
+        <item name="android:windowBackground">#FDF0F5</item>
+        <item name="themeBg">#FDF0F5</item>
+        <item name="themeAccent">#EC4899</item>
+        <item name="themeAccent1">#F472B6</item>
+        <item name="themeAccent2">#FB7185</item>
+        <item name="themeAccent3">#FBBF24</item>
+        <item name="themeAccentLight">#FFE0EF</item>
+    </style>
+
+    <!-- sand -->
+    <style name="Theme.JarvisAssistant.Sand" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#FAF4EC</item>
+        <item name="android:navigationBarColor">#F0E6D6</item>
+        <item name="android:windowBackground">#FAF4EC</item>
+        <item name="themeBg">#FAF4EC</item>
+        <item name="themeAccent">#D97706</item>
+        <item name="themeAccent1">#F59E0B</item>
+        <item name="themeAccent2">#FB923C</item>
+        <item name="themeAccent3">#B45309</item>
+        <item name="themeAccentLight">#FDEBD2</item>
+    </style>
+
+    <!-- mint -->
+    <style name="Theme.JarvisAssistant.Mint" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#EDF9F3</item>
+        <item name="android:navigationBarColor">#DFF2E7</item>
+        <item name="android:windowBackground">#EDF9F3</item>
+        <item name="themeBg">#EDF9F3</item>
+        <item name="themeAccent">#10B981</item>
+        <item name="themeAccent1">#34D399</item>
+        <item name="themeAccent2">#2DD4BF</item>
+        <item name="themeAccent3">#059669</item>
+        <item name="themeAccentLight">#D4F4E3</item>
+    </style>
+
+    <!-- sky -->
+    <style name="Theme.JarvisAssistant.Sky" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#EDF6FD</item>
+        <item name="android:navigationBarColor">#DFEDFA</item>
+        <item name="android:windowBackground">#EDF6FD</item>
+        <item name="themeBg">#EDF6FD</item>
+        <item name="themeAccent">#0284C7</item>
+        <item name="themeAccent1">#38BDF8</item>
+        <item name="themeAccent2">#22D3EE</item>
+        <item name="themeAccent3">#0369A1</item>
+        <item name="themeAccentLight">#D6EBF9</item>
+    </style>
+
+    <!-- lemon -->
+    <style name="Theme.JarvisAssistant.Lemon" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#FAF9E8</item>
+        <item name="android:navigationBarColor">#F0EFDA</item>
+        <item name="android:windowBackground">#FAF9E8</item>
+        <item name="themeBg">#FAF9E8</item>
+        <item name="themeAccent">#CA8A04</item>
+        <item name="themeAccent1">#FACC15</item>
+        <item name="themeAccent2">#FDE047</item>
+        <item name="themeAccent3">#A16207</item>
+        <item name="themeAccentLight">#F5F3CF</item>
+    </style>
+
+    <!-- peach -->
+    <style name="Theme.JarvisAssistant.Peach" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#FFF4EC</item>
+        <item name="android:navigationBarColor">#FCE8DC</item>
+        <item name="android:windowBackground">#FFF4EC</item>
+        <item name="themeBg">#FFF4EC</item>
+        <item name="themeAccent">#F97316</item>
+        <item name="themeAccent1">#FB923C</item>
+        <item name="themeAccent2">#FDBA74</item>
+        <item name="themeAccent3">#EA580C</item>
+        <item name="themeAccentLight">#FFE6D3</item>
+    </style>
+
+    <!-- cloud -->
+    <style name="Theme.JarvisAssistant.Cloud" parent="Theme.JarvisAssistant.Light">
+        <item name="android:statusBarColor">#EEF2F8</item>
+        <item name="android:navigationBarColor">#E2E8F0</item>
+        <item name="android:windowBackground">#EEF2F8</item>
+        <item name="themeBg">#EEF2F8</item>
+        <item name="themeAccent">#64748B</item>
+        <item name="themeAccent1">#94A3B8</item>
+        <item name="themeAccent2">#CBD5E1</item>
+        <item name="themeAccent3">#475569</item>
+        <item name="themeAccentLight">#DEE5EE</item>
+    </style>
+
+    <!-- rose -->
+    <style name="Theme.JarvisAssistant.RoseGold" parent="Theme.JarvisAssistant.Sunset">
+        <item name="android:statusBarColor">#FFE9E4</item>
+        <item name="android:navigationBarColor">#FADDD4</item>
+        <item name="android:windowBackground">#FFE9E4</item>
+        <item name="themeBg">#FFE9E4</item>
+        <item name="themeAccent">#E85D75</item>
+        <item name="themeAccent1">#F43F5E</item>
+        <item name="themeAccent2">#FB7185</item>
+        <item name="themeAccent3">#B45309</item>
+        <item name="themeAccentLight">#FFDCD7</item>
+    </style>
+
+    <!-- obsidian -->
+    <style name="Theme.JarvisAssistant.Obsidian" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#0B0F1A</item>
+        <item name="android:navigationBarColor">#0B0F1A</item>
+        <item name="android:windowBackground">#0B0F1A</item>
+        <item name="themeBg">#0B0F1A</item>
+        <item name="themeAccent">#8B9DFF</item>
+        <item name="themeAccent1">#5B8CFF</item>
+        <item name="themeAccent2">#A78BFA</item>
+        <item name="themeAccent3">#22D3EE</item>
+        <item name="themeAccentLight">#1E2858</item>
+    </style>
+
+    <!-- graphite -->
+    <style name="Theme.JarvisAssistant.Graphite" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#121212</item>
+        <item name="android:navigationBarColor">#121212</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="themeBg">#121212</item>
+        <item name="themeAccent">#9AA5B1</item>
+        <item name="themeAccent1">#6B7280</item>
+        <item name="themeAccent2">#9CA3AF</item>
+        <item name="themeAccent3">#4B5563</item>
+        <item name="themeAccentLight">#232323</item>
+    </style>
+
+    <!-- forest -->
+    <style name="Theme.JarvisAssistant.Forest" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#071A12</item>
+        <item name="android:navigationBarColor">#071A12</item>
+        <item name="android:windowBackground">#071A12</item>
+        <item name="themeBg">#071A12</item>
+        <item name="themeAccent">#34D399</item>
+        <item name="themeAccent1">#10B981</item>
+        <item name="themeAccent2">#2DD4BF</item>
+        <item name="themeAccent3">#A3E635</item>
+        <item name="themeAccentLight">#0F2E22</item>
+    </style>
+
+    <!-- emerald -->
+    <style name="Theme.JarvisAssistant.Emerald" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#042F2E</item>
+        <item name="android:navigationBarColor">#042F2E</item>
+        <item name="android:windowBackground">#042F2E</item>
+        <item name="themeBg">#042F2E</item>
+        <item name="themeAccent">#2DD4BF</item>
+        <item name="themeAccent1">#14B8A6</item>
+        <item name="themeAccent2">#34D399</item>
+        <item name="themeAccent3">#5EEAD4</item>
+        <item name="themeAccentLight">#0A3F3D</item>
+    </style>
+
+    <!-- ocean -->
+    <style name="Theme.JarvisAssistant.Ocean" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#06121F</item>
+        <item name="android:navigationBarColor">#06121F</item>
+        <item name="android:windowBackground">#06121F</item>
+        <item name="themeBg">#06121F</item>
+        <item name="themeAccent">#38BDF8</item>
+        <item name="themeAccent1">#0EA5E9</item>
+        <item name="themeAccent2">#22D3EE</item>
+        <item name="themeAccent3">#7DD3FC</item>
+        <item name="themeAccentLight">#0F2538</item>
+    </style>
+
+    <!-- cyan -->
+    <style name="Theme.JarvisAssistant.Cyanosis" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#041821</item>
+        <item name="android:navigationBarColor">#041821</item>
+        <item name="android:windowBackground">#041821</item>
+        <item name="themeBg">#041821</item>
+        <item name="themeAccent">#22D3EE</item>
+        <item name="themeAccent1">#06B6D4</item>
+        <item name="themeAccent2">#67E8F9</item>
+        <item name="themeAccent3">#A5F3FC</item>
+        <item name="themeAccentLight">#0A2530</item>
+    </style>
+
+    <!-- amethyst -->
+    <style name="Theme.JarvisAssistant.Amethyst" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#140F2E</item>
+        <item name="android:navigationBarColor">#140F2E</item>
+        <item name="android:windowBackground">#140F2E</item>
+        <item name="themeBg">#140F2E</item>
+        <item name="themeAccent">#A78BFA</item>
+        <item name="themeAccent1">#8B5CF6</item>
+        <item name="themeAccent2">#C084FC</item>
+        <item name="themeAccent3">#F0ABFC</item>
+        <item name="themeAccentLight">#221A44</item>
+    </style>
+
+    <!-- violet -->
+    <style name="Theme.JarvisAssistant.Violet" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#1A102E</item>
+        <item name="android:navigationBarColor">#1A102E</item>
+        <item name="android:windowBackground">#1A102E</item>
+        <item name="themeBg">#1A102E</item>
+        <item name="themeAccent">#C084FC</item>
+        <item name="themeAccent1">#A855F7</item>
+        <item name="themeAccent2">#D8B4FE</item>
+        <item name="themeAccent3">#F0ABFC</item>
+        <item name="themeAccentLight">#291944</item>
+    </style>
+
+    <!-- magenta -->
+    <style name="Theme.JarvisAssistant.Magenta" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#2A0A20</item>
+        <item name="android:navigationBarColor">#2A0A20</item>
+        <item name="android:windowBackground">#2A0A20</item>
+        <item name="themeBg">#2A0A20</item>
+        <item name="themeAccent">#F472B6</item>
+        <item name="themeAccent1">#EC4899</item>
+        <item name="themeAccent2">#F9A8D4</item>
+        <item name="themeAccent3">#FB7185</item>
+        <item name="themeAccentLight">#3D1230</item>
+    </style>
+
+    <!-- crimson -->
+    <style name="Theme.JarvisAssistant.Crimson" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#200810</item>
+        <item name="android:navigationBarColor">#200810</item>
+        <item name="android:windowBackground">#200810</item>
+        <item name="themeBg">#200810</item>
+        <item name="themeAccent">#FB7185</item>
+        <item name="themeAccent1">#F43F5E</item>
+        <item name="themeAccent2">#FDA4AF</item>
+        <item name="themeAccent3">#F87171</item>
+        <item name="themeAccentLight">#2F1220</item>
+    </style>
+
+    <!-- amber -->
+    <style name="Theme.JarvisAssistant.Amber" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#1E1503</item>
+        <item name="android:navigationBarColor">#1E1503</item>
+        <item name="android:windowBackground">#1E1503</item>
+        <item name="themeBg">#1E1503</item>
+        <item name="themeAccent">#FBBF24</item>
+        <item name="themeAccent1">#F59E0B</item>
+        <item name="themeAccent2">#FCD34D</item>
+        <item name="themeAccent3">#FDE68A</item>
+        <item name="themeAccentLight">#2C2008</item>
+    </style>
+
+    <!-- lime -->
+    <style name="Theme.JarvisAssistant.Lime" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#131A05</item>
+        <item name="android:navigationBarColor">#131A05</item>
+        <item name="android:windowBackground">#131A05</item>
+        <item name="themeBg">#131A05</item>
+        <item name="themeAccent">#A3E635</item>
+        <item name="themeAccent1">#84CC16</item>
+        <item name="themeAccent2">#BEF264</item>
+        <item name="themeAccent3">#D9F99D</item>
+        <item name="themeAccentLight">#1E2A0A</item>
+    </style>
+
+    <!-- teal -->
+    <style name="Theme.JarvisAssistant.Teal" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#04211E</item>
+        <item name="android:navigationBarColor">#04211E</item>
+        <item name="android:windowBackground">#04211E</item>
+        <item name="themeBg">#04211E</item>
+        <item name="themeAccent">#2DD4BF</item>
+        <item name="themeAccent1">#14B8A6</item>
+        <item name="themeAccent2">#5EEAD4</item>
+        <item name="themeAccent3">#99F6E4</item>
+        <item name="themeAccentLight">#0A302C</item>
+    </style>
+
+    <!-- cobalt -->
+    <style name="Theme.JarvisAssistant.Cobalt" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#081229</item>
+        <item name="android:navigationBarColor">#081229</item>
+        <item name="android:windowBackground">#081229</item>
+        <item name="themeBg">#081229</item>
+        <item name="themeAccent">#60A5FA</item>
+        <item name="themeAccent1">#3B82F6</item>
+        <item name="themeAccent2">#93C5FD</item>
+        <item name="themeAccent3">#BFDBFE</item>
+        <item name="themeAccentLight">#10203E</item>
+    </style>
+
+    <!-- slate -->
+    <style name="Theme.JarvisAssistant.Slate" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#0F172A</item>
+        <item name="android:navigationBarColor">#0F172A</item>
+        <item name="android:windowBackground">#0F172A</item>
+        <item name="themeBg">#0F172A</item>
+        <item name="themeAccent">#94A3B8</item>
+        <item name="themeAccent1">#64748B</item>
+        <item name="themeAccent2">#CBD5E1</item>
+        <item name="themeAccent3">#E2E8F0</item>
+        <item name="themeAccentLight">#1B2438</item>
+    </style>
+
+    <!-- rust -->
+    <style name="Theme.JarvisAssistant.Rust" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#250F05</item>
+        <item name="android:navigationBarColor">#250F05</item>
+        <item name="android:windowBackground">#250F05</item>
+        <item name="themeBg">#250F05</item>
+        <item name="themeAccent">#FB923C</item>
+        <item name="themeAccent1">#F97316</item>
+        <item name="themeAccent2">#FDBA74</item>
+        <item name="themeAccent3">#FDE68A</item>
+        <item name="themeAccentLight">#351A0A</item>
+    </style>
+
+    <!-- wine -->
+    <style name="Theme.JarvisAssistant.Wine" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#230909</item>
+        <item name="android:navigationBarColor">#230909</item>
+        <item name="android:windowBackground">#230909</item>
+        <item name="themeBg">#230909</item>
+        <item name="themeAccent">#F87171</item>
+        <item name="themeAccent1">#EF4444</item>
+        <item name="themeAccent2">#FCA5A5</item>
+        <item name="themeAccent3">#FBBF24</item>
+        <item name="themeAccentLight">#331313</item>
+    </style>
+
+    <!-- royal -->
+    <style name="Theme.JarvisAssistant.Royal" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#0C1226</item>
+        <item name="android:navigationBarColor">#0C1226</item>
+        <item name="android:windowBackground">#0C1226</item>
+        <item name="themeBg">#0C1226</item>
+        <item name="themeAccent">#818CF8</item>
+        <item name="themeAccent1">#6366F1</item>
+        <item name="themeAccent2">#A5B4FC</item>
+        <item name="themeAccent3">#C7D2FE</item>
+        <item name="themeAccentLight">#182040</item>
+    </style>
+
+    <!-- nebula -->
+    <style name="Theme.JarvisAssistant.Nebula" parent="Theme.JarvisAssistant.Dark">
+        <item name="android:statusBarColor">#0A0920</item>
+        <item name="android:navigationBarColor">#0A0920</item>
+        <item name="android:windowBackground">#0A0920</item>
+        <item name="themeBg">#0A0920</item>
+        <item name="themeAccent">#C084FC</item>
+        <item name="themeAccent1">#8B5CF6</item>
+        <item name="themeAccent2">#E879F9</item>
+        <item name="themeAccent3">#22D3EE</item>
+        <item name="themeAccentLight">#161439</item>
+    </style>
+
     <!-- Legacy style aliases -->
-    <style name="Theme.JarvisAssistant.PearlWhite" parent="Theme.JarvisAssistant.Light" />
     <style name="Theme.JarvisAssistant.MidnightOnyx" parent="Theme.JarvisAssistant.Dark" />
     <style name="Theme.JarvisAssistant.CyberpunkNeon" parent="Theme.JarvisAssistant.Dark" />
     <style name="Theme.JarvisAssistant.EmeraldObsidian" parent="Theme.JarvisAssistant.Dark" />
-    <style name="Theme.JarvisAssistant.RoseGold" parent="Theme.JarvisAssistant.Sunset" />
 
     <style name="SettingsCategoryChip">
         <item name="android:layout_width">wrap_content</item>

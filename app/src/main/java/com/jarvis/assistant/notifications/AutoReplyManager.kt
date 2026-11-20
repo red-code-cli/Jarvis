@@ -81,6 +81,8 @@ object AutoReplyManager {
         if (!preferences.isAutoReplyEnabled) return
         val selectedKey = appKeyFor(sbn.packageName) ?: return
         if (selectedKey !in preferences.autoReplyApps) return
+        // Per-app deny policy: never auto-reply to apps the owner blocked.
+        if (preferences.isNotificationPackageDenied(sbn.packageName)) return
 
         // If the owner is already using that messaging app, let them answer normally.
         val activePackage = JarvisAccessibilityService.instance
@@ -184,7 +186,7 @@ object AutoReplyManager {
             rawText.startsWith("Aap: ", ignoreCase = true)
         ) return null
 
-        if (isGenericText(rawText) || looksSensitive(rawText)) return null
+        if (isGenericText(rawText) || NotificationPolicy.isSensitive(rawText)) return null
 
         var sender = title
         var body = rawText
@@ -222,19 +224,6 @@ object AutoReplyManager {
             "missed voice call", "tap to view", "attachment", "sticker", "gif",
             "document", "contact card", "location", "you have a new message"
         )
-    }
-
-    private fun looksSensitive(text: String): Boolean {
-        val lower = text.lowercase()
-        if (Regex("\\b(otp|one[- ]time password|verification code|passcode)\\b").containsMatchIn(lower)) {
-            return true
-        }
-        if (Regex("\\b\\d{4,8}\\b").containsMatchIn(text) &&
-            Regex("\\b(code|pin|password|otp|verify|verification)\\b").containsMatchIn(lower)
-        ) {
-            return true
-        }
-        return false
     }
 
     private fun sendDirectReply(context: Context, incoming: Incoming, reply: String): Boolean {
