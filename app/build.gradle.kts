@@ -13,6 +13,8 @@ fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").
 // The release workflow passes -PversionCodeOverride / -PversionNameOverride so the
 // APK can be cut from a tag or a manual dispatch without editing this file. The
 // override is strictly validated, so a stale or malformed value can never ship.
+val defaultVersionCode = 162
+val defaultVersionName = "1.17.0"
 val overrideVersionCode = providers.gradleProperty("versionCodeOverride").orNull?.toIntOrNull()
 val overrideVersionName = providers.gradleProperty("versionNameOverride").orNull
 
@@ -47,8 +49,8 @@ android {
         applicationId = "com.jarvis.assistant"
         minSdk = 26
         targetSdk = 34
-        versionCode = overrideVersionCode ?: 162
-        versionName = overrideVersionName ?: "1.17.0"
+        versionCode = overrideVersionCode ?: defaultVersionCode
+        versionName = overrideVersionName ?: defaultVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEVELOPER_NAME", buildConfigString(developerName.ifBlank { "Unverified developer" }))
