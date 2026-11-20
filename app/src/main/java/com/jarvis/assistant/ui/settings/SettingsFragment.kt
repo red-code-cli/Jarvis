@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -358,6 +359,76 @@ class SettingsFragment : Fragment() {
             else -> "Balanced · recommended"
         }    }
 
+    /**
+     * Per-app notification allow/deny dialog. Lists every package the listener has
+     * recently seen (plus the built-in messaging apps) with a switch per app.
+     * Stored encrypted; denied apps are never read aloud or auto-replied.
+     */
+    private fun showNotificationAppsDialog() {
+        val context = requireContext()
+        val prefs = preferences
+        val knownPackages = linkedMapOf(
+            "com.whatsapp" to "WhatsApp",
+            "com.whatsapp.w4b" to "WhatsApp Business",
+            "com.facebook.orca" to "Messenger",
+            "com.instagram.android" to "Instagram"
+        )
+        for (pkg in prefs.notificationSeenPackages.sorted()) {
+            if (pkg !in knownPackages) {
+                val label = try {
+                    val info = context.packageManager.getApplicationInfo(pkg, 0)
+                    context.packageManager.getApplicationLabel(info).toString()
+                } catch (_: Throwable) {
+                    pkg.substringAfterLast('.').ifBlank { pkg }
+                }
+                knownPackages[pkg] = label
+            }
+        }
+        if (knownPackages.isEmpty()) {
+            MaterialAlertDialogBuilder(context)
+                .setTitle("Notification apps")
+                .setMessage("Abhi tak koi notification nahi aayi. Jaisi hi apps se notifications aayengi, yahan unhe manage kar paoge.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        val itemsLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 16, 48, 8)
+        }
+        for ((pkg, label) in knownPackages) {
+            val denied = prefs.isNotificationPackageDenied(pkg)
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, 8, 0, 8)
+            }
+            val name = android.widget.TextView(context).apply {
+                text = label
+                setTextColor(0xFF202124.toInt())
+                textSize = 15f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            val toggle = com.google.android.material.switchmaterial.SwitchMaterial(context).apply {
+                isChecked = !denied
+                setOnCheckedChangeListener { _, isChecked ->
+                    prefs.setNotificationPackageDenied(pkg, !isChecked)
+                }
+            }
+            row.addView(name)
+            row.addView(toggle)
+            itemsLayout.addView(row)
+        }
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle("Notification apps")
+            .setMessage("Off matlab un apps ki notifications kabhi nahi suni/parhi jayengi")
+            .setView(itemsLayout)
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
     private fun setupClickListeners() {
         // Profile Card -> Change Name
         binding.cardProfile.setOnClickListener {
@@ -401,6 +472,10 @@ class SettingsFragment : Fragment() {
 
         binding.rowWakeWords.setOnClickListener {
             showWakeWordDialog()
+        }
+
+        binding.rowNotificationApps.setOnClickListener {
+            showNotificationAppsDialog()
         }
 
         binding.switchBatterySaver.setOnCheckedChangeListener { _, isChecked ->

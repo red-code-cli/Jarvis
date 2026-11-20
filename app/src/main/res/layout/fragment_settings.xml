@@ -956,6 +956,65 @@
                 android:layout_marginStart="8dp"
                 app:useMaterialThemeColors="true" />
         </LinearLayout>
+        <!-- Per-app notification control -->
+        <LinearLayout
+            android:id="@+id/rowNotificationApps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Notification app control"
+                    android:src="@drawable/ic_settings_shield"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="App-level notification control"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Chuno ki kaunse apps ki notifications sunni hain"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Open app list"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
         <!-- Shake to Talk -->
         <LinearLayout
             android:id="@+id/rowShakeToTalk"

@@ -48,6 +48,27 @@ class AppPreferences(context: Context) {
         Log.e(TAG, "Encrypted voiceprint storage could not be initialized; using legacy storage", e)
         null
     }
+
+    /**
+     * Per-app notification allow/deny policy (which apps may be read aloud or
+     * auto-replied). App choices are personal data, so they are stored in their
+     * own AES-256 encrypted prefs file, never in the plain one.
+     */
+    private val secureNotificationPrefs: SharedPreferences? = try {
+        val masterKey = MasterKey.Builder(context.applicationContext)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context.applicationContext,
+            ENCRYPTED_NOTIF_PREF_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        Log.e(TAG, "Encrypted notification policy storage could not be initialized", e)
+        null
+    }
     private val gson = Gson()
 
     init {
@@ -63,6 +84,9 @@ class AppPreferences(context: Context) {
         private const val PREF_NAME = "jarvis_prefs"
         private const val ENCRYPTED_API_PREF_NAME = "jarvis_secure_api_prefs"
         private const val ENCRYPTED_VOICE_PREF_NAME = "jarvis_secure_voice_prefs"
+        private const val ENCRYPTED_NOTIF_PREF_NAME = "jarvis_secure_notif_prefs"
+        private const val KEY_NOTIFICATION_DENIED_PACKAGES = "key_notification_denied_packages"
+        private const val KEY_NOTIFICATION_SEEN_PACKAGES = "key_notification_seen_packages"
         private const val TAG = "AppPreferences"
         private const val KEY_API_KEY = "key_api_key"
         private const val KEY_MODEL = "key_model"
@@ -560,6 +584,50 @@ class AppPreferences(context: Context) {
     var isUnreadMessagesReaderEnabled: Boolean
         get() = prefs.getBoolean(KEY_UNREAD_MESSAGES_READER, true)
         set(value) = prefs.edit().putBoolean(KEY_UNREAD_MESSAGES_READER, value).apply()
+
+    /** True when notifications from [pkg] are never read aloud or auto-replied. */
+    fun isNotificationPackageDenied(pkg: String): Boolean {
+        val secure = secureNotificationPrefs ?: return false
+        return try {
+            val raw = secure.getString(KEY_NOTIFICATION_DENIED_PACKAGES, null) ?: return false
+            val map = gson.fromJson(raw, object : TypeToken<Map<String, Boolean>>() {}.type)
+            map?.get(pkg) == true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /** Sets the deny state for [pkg] in the encrypted store. */
+    fun setNotificationPackageDenied(pkg: String, denied: Boolean) {
+        val secure = secureNotificationPrefs ?: return
+        try {
+            val raw = secure.getString(KEY_NOTIFICATION_DENIED_PACKAGES, null)
+            val map = raw?.let {
+                gson.fromJson(it, object : TypeToken<MutableMap<String, Boolean>>() {}.type)
+            } ?: mutableMapOf()
+            if (denied) map[pkg] = true else map.remove(pkg)
+            secure.edit().putString(KEY_NOTIFICATION_DENIED_PACKAGES, gson.toJson(map)).apply()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not persist notification policy", e)
+        }
+    }
+
+    /** Recently seen notification packages, used only to populate the per-app settings list. */
+    var notificationSeenPackages: Set<String>
+        get() = prefs.getStringSet(KEY_NOTIFICATION_SEEN_PACKAGES, emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_NOTIFICATION_SEEN_PACKAGES, value).apply()
+
+    /** Records that we saw a notification from [pkg] (capped to keep the list small). */
+    fun addNotificationSeenPackage(pkg: String) {
+        val seen = notificationSeenPackages.toMutableSet()
+        seen.add(pkg)
+        if (seen.size > 50) {
+            val sorted = seen.sortedByDescending { it }.take(50).toMutableSet()
+            notificationSeenPackages = sorted
+        } else {
+            notificationSeenPackages = seen
+        }
+    }
 
     /** Emergency Voice SOS: "Code Red" / "Emergency" sends live location to contact. */
     var isEmergencySosEnabled: Boolean

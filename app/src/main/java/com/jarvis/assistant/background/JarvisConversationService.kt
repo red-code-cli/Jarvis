@@ -1642,7 +1642,7 @@ class JarvisConversationService : Service() {
                                 val isLive = liveWebSocket?.isSessionReady() == true
                                 if (!preferences.isSilentExecutionMode && !isLive) {
                                     Log.i("JarvisService", "Offline fallback: Speaking confirmation via announcer: '$summaryToSpeak'")
-                                    voiceAnnouncer?.speak(summaryToSpeak, "task_done") {
+                                    voiceAnnouncer?.speak(summaryToSpeak.orEmpty(), "task_done") {
                                         handleAnnouncementDone("task_done")
                                     }
                                 }

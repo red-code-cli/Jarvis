@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import com.jarvis.assistant.network.GeminiLiveWebSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
