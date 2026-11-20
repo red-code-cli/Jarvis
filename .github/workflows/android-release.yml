@@ -209,6 +209,18 @@ jobs:
           path: out/*
           if-no-files-found: error
 
+      - name: Compose release notes (Hinglish guide + SHA-256)
+        run: |
+          sed "s/__VERSION__/${{ steps.version.outputs.name }}/g" .github/RELEASE_NOTES_TEMPLATE.md > out/changelog.txt
+          {
+            echo "## Jarvis v${{ steps.version.outputs.name }} (versionCode ${{ steps.version.outputs.code }})"
+            echo ""
+            cat out/changelog.txt
+            echo ""
+            echo "### SHA-256 checksums"
+            cat out/checksums.txt
+          } > out/release_body.md
+
       # Publishes the HTTPS update manifest next to the APK so the in-app updater can find it
       # at releases/latest/download/update.json. Optional repo variables let a release be made
       # mandatory / set a minimum supported version without touching code:
@@ -225,20 +237,9 @@ jobs:
           mandatory="${UPDATE_MANDATORY:-false}"
           min_supported="${UPDATE_MIN_SUPPORTED:-0}"
           url="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${name}/jarvis-v${name}.apk"
-          sh scripts/make_update_json.sh "out/jarvis-v${name}.apk" "$code" "$name" "$url" "$min_supported" "$mandatory" "" "out/update.json"
+          sh scripts/make_update_json.sh "out/jarvis-v${name}.apk" "$code" "$name" "$url" "$min_supported" "$mandatory" "out/changelog.txt" "out/update.json"
           echo "---- update.json ----"
           cat out/update.json
-
-      - name: Compose release notes (Hinglish guide + SHA-256)
-        run: |
-          {
-            echo "## Jarvis v${{ steps.version.outputs.name }} (versionCode ${{ steps.version.outputs.code }})"
-            echo ""
-            sed "s/__VERSION__/${{ steps.version.outputs.name }}/g" .github/RELEASE_NOTES_TEMPLATE.md
-            echo ""
-            echo "### SHA-256 checksums"
-            cat out/checksums.txt
-          } > out/release_body.md
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

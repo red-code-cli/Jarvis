@@ -929,9 +929,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun maybeCheckForUpdates() {
-        if (!com.jarvis.assistant.update.UpdateCoordinator.shouldCheckOnResume()) return
         lifecycleScope.launch {
-            runCatching { com.jarvis.assistant.update.UpdateCoordinator.checkNow(this@MainActivity) }
+            // Always re-evaluate the cached manifest so an available update keeps being
+            // surfaced on every app open (the user asked for this — "Later" must not hide it).
+            runCatching { com.jarvis.assistant.update.UpdateCoordinator.evaluateCached(this@MainActivity) }
+                .onSuccess { action -> showOptionalUpdatePrompt(action) }
+            // Fresh network check, throttled so we don't hammer the server on every resume.
+            if (com.jarvis.assistant.update.UpdateCoordinator.shouldCheckOnResume(5 * 60 * 1000L)) {
+                runCatching { com.jarvis.assistant.update.UpdateCoordinator.checkNow(this@MainActivity) }
+                    .onSuccess { action -> showOptionalUpdatePrompt(action) }
+            }
+        }
+    }
+
+    /** Gentle in-app prompt for optional updates (only when not already force-blocked). */
+    private fun showOptionalUpdatePrompt(action: com.jarvis.assistant.update.UpdateAction) {
+        if (action != com.jarvis.assistant.update.UpdateAction.OPTIONAL) return
+        if (com.jarvis.assistant.update.UpdateManager.isForceUpdateActive()) return
+        val manifest = com.jarvis.assistant.update.UpdateManager.cachedManifest() ?: return
+        activeSnackbar?.dismiss()
+        activeSnackbar = Snackbar.make(
+            binding.rootMainLayout,
+            "Naya update Jarvis ${manifest.latestVersionName} available hai. Abhi update karo.",
+            Snackbar.LENGTH_INDEFINITE,
+        ).apply {
+            setAnchorView(binding.bottomDock)
+            setAction("Update") {
+                runCatching {
+                    startActivity(Intent(this@MainActivity, com.jarvis.assistant.update.UpdateActivity::class.java))
+                }
+            }
+            show()
         }
     }
 

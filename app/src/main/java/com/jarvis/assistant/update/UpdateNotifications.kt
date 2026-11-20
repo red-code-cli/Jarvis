@@ -38,7 +38,14 @@ object UpdateNotifications {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val title = if (mandatory) "Update zaroori hai" else "Naya update available"
-            val text = "Jarvis ${manifest.latestVersionName} aa gaya hai. Update karke naye features paayein."
+            val baseText = "Jarvis ${manifest.latestVersionName} aa gaya hai. Update karke naye features paayein."
+            val notes = manifest.releaseNotes?.trim().orEmpty()
+            val text = if (notes.isNotEmpty()) {
+                val trimmed = if (notes.length > 500) notes.take(500) + "…" else notes
+                "$baseText\n\nIs update me kya fix hua:\n$trimmed"
+            } else {
+                baseText
+            }
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_jarvis_logo)
                 .setContentTitle(title)

@@ -16,12 +16,13 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Downloads the free sherpa-onnx wake-word and speaker models on first use.
+ * Prepares the sherpa-onnx wake-word and speaker models for first use.
  *
- * Large models are never bundled in the APK (which keeps the download small): they are
- * fetched from the official sherpa-onnx GitHub releases and extracted on device with
- * Apache Commons Compress (pure Java, so no native bz2 library). Downloads support resume
- * (HTTP Range) and are verified by size before being promoted from `.part` to final.
+ * The KWS wake-word model is BUNDLED in the APK (assets/wake-models/bundled) as a fallback:
+ * if the remote copy cannot be downloaded (offline, GitHub blocked, …) it is restored from
+ * assets so wake listening always works. The speaker-embedding model stays download-only and is
+ * optional — without it, owner verification fails open. Downloads support resume (HTTP Range)
+ * and are verified by size before being promoted from `.part` to final.
  *
  * The URL list lives in `assets/wake-models/manifest.json` so a changed URL is a data
  * change, not a code change.
@@ -53,6 +54,14 @@ object WakeModelDownloader {
     fun speakerModelFile(context: Context): File =
         File(modelsDir(context), "3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx")
 
+    /**
+     * True only when the KWS wake-word model is present. The speaker model is NOT required for
+     * wake listening: when it is missing, owner verification fails open (no profile / no audio /
+     * extraction failure all activate), so wake must never be blocked by a speaker-model download.
+     */
+    fun wakeModelReady(context: Context): Boolean =
+        File(modelsDir(context), "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01/tokens.txt").exists()
+
     fun isReady(context: Context): Boolean = entries(context).all { entry ->
         File(modelsDir(context), entry.readyMarker).exists()
     }
@@ -75,6 +84,9 @@ object WakeModelDownloader {
     /**
      * Ensures every model is present. [onProgress] receives 0..1 across all entries.
      * Safe to call repeatedly; already-downloaded entries are skipped.
+     *
+     * The KWS wake model has a bundled asset fallback: if the remote download fails (offline,
+     * GitHub blocked, …) it is restored from the APK assets so wake keeps working.
      */
     suspend fun ensureModels(
         context: Context,
@@ -87,13 +99,45 @@ object WakeModelDownloader {
         all.forEach { entry ->
             val marker = File(root, entry.readyMarker)
             if (!marker.exists()) {
-                val ok = downloadAndExtract(context, entry, root)
+                var ok = downloadAndExtract(context, entry, root)
+                if (!ok && entry.id == KWS_ENTRY_ID) {
+                    ok = restoreBundledWakeModel(context, entry, root)
+                }
                 if (!ok) return@withContext false
             }
             done++
             onProgress(done.toFloat() / all.size)
         }
         true
+    }
+
+    /**
+     * Ensures ONLY the KWS wake model is present (remote download with bundled-asset fallback).
+     * Used by the service gate so wake listening never depends on the speaker model.
+     */
+    suspend fun ensureWakeModels(context: Context): Boolean = withContext(Dispatchers.IO) {
+        val entry = entries(context).firstOrNull { it.id == KWS_ENTRY_ID } ?: return@withContext false
+        val root = modelsDir(context)
+        val marker = File(root, entry.readyMarker)
+        if (marker.exists()) return@withContext true
+        val ok = downloadAndExtract(context, entry, root) || restoreBundledWakeModel(context, entry, root)
+        ok
+    }
+
+    /** Copies the bundled KWS model (assets/wake-models/bundled/…) into the model folder. */
+    private fun restoreBundledWakeModel(context: Context, entry: Entry, root: File): Boolean {
+        return runCatching {
+            val assetRoot = "wake-models/bundled/${entry.readyMarker.substringBefore('/')}"
+            val names = context.assets.list(assetRoot) ?: emptyArray()
+            names.forEach { name ->
+                val asset = context.assets.open("$assetRoot/$name")
+                val target = File(root, "${entry.readyMarker.substringBefore('/')}/$name")
+                target.parentFile?.mkdirs()
+                FileOutputStream(target).use { out -> asset.copyTo(out) }
+                asset.close()
+            }
+            File(root, entry.readyMarker).exists()
+        }.onFailure { Log.w(TAG, "Bundled restore ${entry.id} failed: ${it.message}") }.getOrDefault(false)
     }
 
     private fun downloadAndExtract(context: Context, entry: Entry, root: File): Boolean {
@@ -168,4 +212,5 @@ object WakeModelDownloader {
     }
 
     private const val MAX_ATTEMPTS = 4
+    private const val KWS_ENTRY_ID = "kws-gigaspeech"
 }

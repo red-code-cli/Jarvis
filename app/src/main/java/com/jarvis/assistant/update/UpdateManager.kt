@@ -67,9 +67,10 @@ object UpdateManager {
     fun currentAction(installedVersionCode: Int = BuildConfig.VERSION_CODE): UpdateAction =
         UpdateDecision.decide(installedVersionCode, cachedManifest(), prefs().updateSkipVersionCode)
 
-    /** User tapped "Later" on an optional update. */
+    /** User tapped "Later" on an optional update. The prompt is NOT permanently silenced:
+     * it simply clears any old skip latch so the next check shows the update again. */
     fun skipVersion(versionCode: Int) {
-        prefs().updateSkipVersionCode = versionCode
+        prefs().updateSkipVersionCode = 0
     }
 
     fun installBaseUrl(context: Context): String {

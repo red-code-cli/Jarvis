@@ -5,7 +5,7 @@ import org.junit.Test
 
 /**
  * Pure-JVM tests for the update decision table: fail-open, downgrade block, mandatory force
- * and the skipped-version rule.
+ * and the never-hide-optional rule (an update keeps showing until the user actually updates).
  */
 class UpdateDecisionTest {
 
@@ -57,8 +57,9 @@ class UpdateDecisionTest {
     }
 
     @Test
-    fun skippedOptionalIsHiddenButForceWins() {
-        assertEquals(UpdateAction.NONE, UpdateDecision.decide(161, manifest(162), 162))
+    fun skippedVersionNeverHidesOptionalUpdate() {
+        // "Later" must NOT hide the update: it keeps appearing until the user actually updates.
+        assertEquals(UpdateAction.OPTIONAL, UpdateDecision.decide(161, manifest(162), 162))
         assertEquals(UpdateAction.FORCE, UpdateDecision.decide(161, manifest(162, mandatory = true), 162))
     }
 

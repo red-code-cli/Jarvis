@@ -194,6 +194,7 @@ class ThemeSelectionBottomSheet : BottomSheetDialogFragment() {
 
         Toast.makeText(requireContext(), "Custom theme set to $hex", Toast.LENGTH_SHORT).show()
 
+        applyThemeImmediately()
         homeFragment()?.setOrbTheme("custom", hex)
 
         dismiss()
@@ -204,6 +205,7 @@ class ThemeSelectionBottomSheet : BottomSheetDialogFragment() {
         preferences.appTheme = themeKey
         updateCheckmarks(themeKey)
         Toast.makeText(requireContext(), "Theme set to $themeName", Toast.LENGTH_SHORT).show()
+        applyThemeImmediately()
         homeFragment()?.setOrbTheme(themeKey, null)
         dismiss()
         activity?.recreate()
@@ -217,6 +219,18 @@ class ThemeSelectionBottomSheet : BottomSheetDialogFragment() {
         homeFragment()?.setOrbStyle(styleKey)
         dismiss()
         activity?.recreate()
+    }
+
+    /**
+     * Applies the newly selected theme immediately (before the activity recreate), so the
+     * change is visible even if the recreate is delayed or interrupted.
+     */
+    private fun applyThemeImmediately() {
+        val host = activity as? MainActivity ?: return
+        runCatching {
+            com.jarvis.assistant.util.ThemeManager.applyTheme(host)
+            com.jarvis.assistant.util.ThemeManager.applyDynamicBackground(host.findViewById(android.R.id.content))
+        }
     }
 
     private fun homeFragment(): HomeFragment? {
