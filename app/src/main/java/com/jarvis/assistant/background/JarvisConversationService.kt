@@ -27,8 +27,6 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.jarvis.assistant.JarvisApp
@@ -620,7 +618,7 @@ class JarvisConversationService : Service() {
     private var wakeModelSetupInFlight = false
     @Volatile
     private var wakeModelSetupFailedAt = 0L
-    private var tts: TextToSpeech? = null
+    private var voiceAnnouncer: com.jarvis.assistant.audio.JarvisVoiceAnnouncer? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
     private var standbyActivatedTime = 0L
@@ -655,7 +653,13 @@ class JarvisConversationService : Service() {
         super.onCreate()
         activeInstance = this
         createChannel()
-        initTts()
+        voiceAnnouncer = com.jarvis.assistant.audio.JarvisVoiceAnnouncer(
+            applicationContext,
+            apiKeyProvider = { preferences.apiKey },
+            modelProvider = { preferences.aiModel },
+            voiceNameProvider = { preferences.voice },
+            notificationChannelId = CHANNEL_ID
+        )
         startCallMonitor()
         initShakeDetector()
         ensureMicrophoneForegroundService()
@@ -754,39 +758,6 @@ class JarvisConversationService : Service() {
         }
     }
 
-    private fun initTts() {
-        try {
-            tts = TextToSpeech(applicationContext) { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    tts?.language = Locale.US
-                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                        override fun onStart(utteranceId: String?) {
-                            Log.d("JarvisService", "TTS onStart: $utteranceId")
-                        }
-
-                        override fun onDone(utteranceId: String?) {
-                            Log.d("JarvisService", "TTS onDone: $utteranceId")
-                            handleTtsDone(utteranceId)
-                        }
-
-                        @Deprecated("Deprecated in Java")
-                        override fun onError(utteranceId: String?) {
-                            Log.e("JarvisService", "TTS onError: $utteranceId")
-                            handleTtsDone(utteranceId)
-                        }
-
-                        override fun onError(utteranceId: String?, errorCode: Int) {
-                            Log.e("JarvisService", "TTS onError: $utteranceId code: $errorCode")
-                            handleTtsDone(utteranceId)
-                        }
-                    })
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("JarvisService", "Failed to init TTS: ${e.message}")
-        }
-    }
-
     private fun handleAntiTheftAlert() {
         serviceScope.launch(Dispatchers.Main) {
             vibrateBriefly()
@@ -794,7 +765,9 @@ class JarvisConversationService : Service() {
             val warning = "Warning! Intruder detected! Phone ko haath mat lagao! Roshan ke phone ko turant wapas rakho!"
             _events.emit("TABLE GUARD ALERT: Unauthorized motion detected!")
             try {
-                tts?.speak(warning, TextToSpeech.QUEUE_FLUSH, null, "anti_theft_alarm")
+                voiceAnnouncer?.speak(warning, "anti_theft_alarm") {
+                    handleAnnouncementDone("anti_theft_alarm")
+                }
             } catch (_: Throwable) {}
         }
     }
@@ -858,7 +831,7 @@ class JarvisConversationService : Service() {
         }
     }
 
-    private fun handleTtsDone(utteranceId: String?) {
+    private fun handleAnnouncementDone(utteranceId: String?) {
         // Local fallback speech only; natural Gemini Live neural audio remains the main voice.
         if (utteranceId?.startsWith("auto_update") == true ||
             utteranceId?.startsWith("task_done") == true ||
@@ -913,14 +886,21 @@ class JarvisConversationService : Service() {
                 if (_conversationState.value != ConversationState.SPEAKING) {
                     setConversationState(ConversationState.SPEAKING)
                 }
-                val speakResult = tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utterance)
-                    ?: TextToSpeech.ERROR
-                if (speakResult == TextToSpeech.SUCCESS) {
-                    lastSpokenUpdateAt = System.currentTimeMillis()
+                // Prefer the live Gemini session (it is already connected and audible);
+                // otherwise fall back to the one-shot announcer.
+                if (liveWebSocket?.isSessionReady() == true) {
+                    liveWebSocket?.sendClientContent(
+                        "System update: $clean Say exactly this update to the user in one short sentence now. Do not call any tool."
+                    )
+                } else {
+                    voiceAnnouncer?.speak(clean, utterance) {
+                        handleAnnouncementDone(utterance)
+                    }
                 }
-                Log.i("JarvisService", "Autonomous spoken update ($speakResult): $clean")
+                lastSpokenUpdateAt = System.currentTimeMillis()
+                Log.i("JarvisService", "Autonomous spoken update: $clean")
             } catch (t: Throwable) {
-                Log.w("JarvisService", "Autonomous TTS failed: ${t.message}")
+                Log.w("JarvisService", "Autonomous spoken update failed: ${t.message}")
                 if (_conversationState.value == ConversationState.SPEAKING) {
                     setConversationState(ConversationState.IDLE)
                 }
@@ -1258,6 +1238,8 @@ class JarvisConversationService : Service() {
             }
         ).apply { start() }
 
+        voiceAnnouncer?.attachAudioPlayer(audioPlayer)
+
         serviceScope.launch(Dispatchers.IO) {
             val systemPrompt = generateCurrentSystemPrompt()
 
@@ -1319,13 +1301,10 @@ class JarvisConversationService : Service() {
                                         if (!wakeGreetingAudioReceived && _isSessionOn.value &&
                                             audioPlayer?.isPlaying() != true
                                         ) {
-                                            Log.i("JarvisService", "Wake greeting fallback via local TTS")
-                                            tts?.speak(
-                                                wakeGreeting,
-                                                TextToSpeech.QUEUE_FLUSH,
-                                                null,
-                                                "wake_greeting"
-                                            )
+                                            Log.i("JarvisService", "Wake greeting fallback via announcer")
+                                            voiceAnnouncer?.speak(wakeGreeting, "wake_greeting") {
+                                                handleAnnouncementDone("wake_greeting")
+                                            }
                                         }
                                     }
                                 }
@@ -1358,13 +1337,10 @@ class JarvisConversationService : Service() {
                                         if (!wakeGreetingAudioReceived && _isSessionOn.value &&
                                             audioPlayer?.isPlaying() != true
                                         ) {
-                                            Log.i("JarvisService", "Persona greeting fallback via local TTS")
-                                            tts?.speak(
-                                                greeting,
-                                                TextToSpeech.QUEUE_FLUSH,
-                                                null,
-                                                "persona_greeting"
-                                            )
+                                            Log.i("JarvisService", "Persona greeting fallback via announcer")
+                                            voiceAnnouncer?.speak(greeting, "persona_greeting") {
+                                                handleAnnouncementDone("persona_greeting")
+                                            }
                                         }
                                     }
                                 }
@@ -1665,8 +1641,10 @@ class JarvisConversationService : Service() {
                                 lastCompletedTaskSummary = null
                                 val isLive = liveWebSocket?.isSessionReady() == true
                                 if (!preferences.isSilentExecutionMode && !isLive) {
-                                    Log.i("JarvisService", "Offline fallback: Speaking confirmation via TTS: '$summaryToSpeak'")
-                                    tts?.speak(summaryToSpeak, TextToSpeech.QUEUE_FLUSH, null, "task_done")
+                                    Log.i("JarvisService", "Offline fallback: Speaking confirmation via announcer: '$summaryToSpeak'")
+                                    voiceAnnouncer?.speak(summaryToSpeak, "task_done") {
+                                        handleAnnouncementDone("task_done")
+                                    }
                                 }
                             }
 
@@ -1723,7 +1701,7 @@ class JarvisConversationService : Service() {
                                                 Log.i("JarvisService", "Auto-resume cancelled because the task/session changed or the user spoke")
                                                 return@launch
                                             }
-                                            val playbackActive = audioPlayer?.isPlaying() == true || tts?.isSpeaking == true ||
+                                            val playbackActive = audioPlayer?.isPlaying() == true || voiceAnnouncer?.isSpeaking() == true ||
                                                 _conversationState.value == ConversationState.SPEAKING
                                             if (playbackActive) {
                                                 quietSince = 0L
@@ -1895,7 +1873,7 @@ class JarvisConversationService : Service() {
                 }
 
                 // Assistant is speaking / AudioTrack or TTS is actively playing:
-                val isSpeakerActive = (audioPlayer?.isPlaying() == true) || (tts?.isSpeaking == true) ||
+                val isSpeakerActive = (audioPlayer?.isPlaying() == true) || (voiceAnnouncer?.isSpeaking() == true) ||
                         (_conversationState.value == ConversationState.SPEAKING)
 
                 if (isSpeakerActive) {
@@ -3031,7 +3009,7 @@ class JarvisConversationService : Service() {
                                 if (!alreadySpoke && liveWebSocket?.isSessionReady() != true) {
                                     // Offline fallback: speak via TTS only when Gemini Live is offline
                                     lastCompletedTaskSummary = null
-                                    tts?.speak(summary, TextToSpeech.QUEUE_FLUSH, null, "task_done")
+                                    voiceAnnouncer?.speak(summary, "task_done") { handleAnnouncementDone("task_done") }
                                 } else if (!alreadySpoke) {
                                     // Gemini may finish the tool loop silently; guarantee one update.
                                     ensureSpokenUpdate("Task complete ho gaya sir. $summary", 3_500L)
@@ -3902,6 +3880,8 @@ class JarvisConversationService : Service() {
         audioPlayer?.release()
         audioPlayer = null
 
+        voiceAnnouncer?.attachAudioPlayer(null)
+
         liveWebSocket?.disconnect()
         liveWebSocket = null
 
@@ -4290,7 +4270,7 @@ class JarvisConversationService : Service() {
         Log.i("JarvisService", "Voice barge-in accepted (minFrames=$minFrames)")
         isBargingIn = true
         audioPlayer?.flush()
-        try { tts?.stop() } catch (_: Exception) {}
+        voiceAnnouncer?.stop()
         setConversationState(ConversationState.LISTENING)
         lastUserSpeechDetectedTime = now
         hasSpeechInCurrentUtterance = true
@@ -4486,7 +4466,7 @@ class JarvisConversationService : Service() {
             else -> "Pehle apni awaaz enroll karo. Settings me Voice section kholo."
         }
         try {
-            tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, "voice_enroll_needed")
+            voiceAnnouncer?.speak(message, "voice_enroll_needed")
         } catch (_: Throwable) {
         }
         serviceScope.launch { _events.emit("Voice enrollment needed") }
@@ -4566,11 +4546,8 @@ class JarvisConversationService : Service() {
         shakeDetector = null
         stopActiveConversation()
         exitStandbyListening()
-        try {
-            tts?.stop()
-            tts?.shutdown()
-        } catch (_: Exception) {}
-        tts = null
+        voiceAnnouncer?.shutdown()
+        voiceAnnouncer = null
         stopWakeEngine()
         releaseWakeLock()
         serviceScope.cancel()
@@ -4661,7 +4638,7 @@ class JarvisConversationService : Service() {
 
             // A ringing call takes priority over whatever the assistant was saying.
             audioPlayer?.flush()
-            try { tts?.stop() } catch (_: Throwable) {}
+            voiceAnnouncer?.stop()
 
             if (_isSessionOn.value) {
                 liveWebSocket?.sendClientContent(
@@ -4671,9 +4648,9 @@ class JarvisConversationService : Service() {
                 )
             } else {
                 try {
-                    tts?.speak(question, TextToSpeech.QUEUE_FLUSH, null, "incoming_call")
+                    voiceAnnouncer?.speak(question, "incoming_call") { handleAnnouncementDone("incoming_call") }
                 } catch (t: Throwable) {
-                    Log.w("JarvisService", "Call announcement TTS failed: ${t.message}")
+                    Log.w("JarvisService", "Call announcement failed: ${t.message}")
                 }
             }
         }
@@ -4737,7 +4714,7 @@ class JarvisConversationService : Service() {
                 )
             } else {
                 try {
-                    tts?.speak(confirmation, TextToSpeech.QUEUE_FLUSH, null, "call_decision")
+                    voiceAnnouncer?.speak(confirmation, "call_decision") { handleAnnouncementDone("call_decision") }
                 } catch (_: Throwable) {
                 }
             }

@@ -9,6 +9,11 @@ import android.telecom.TelecomManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.jarvis.assistant.automation.accessibility.JarvisAccessibilityService
+import com.jarvis.assistant.privilege.PrivilegeManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Answers or ends the current call through TelecomManager. When the platform
@@ -17,6 +22,21 @@ import com.jarvis.assistant.automation.accessibility.JarvisAccessibilityService
  */
 object PhoneCallController {
     private const val TAG = "PhoneCallController"
+
+    private val privilegeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Last-resort fallback: when TelecomManager and Accessibility both fail, a root or
+     * Shizuku shell can inject KEYCODE_HEADSETHOOK (79), which toggles answer/hangup.
+     * Returns false when no privileged shell is available (LOCAL mode).
+     */
+    private fun privilegedHook(): Boolean {
+        if (PrivilegeManager.currentMode() == PrivilegeManager.Mode.LOCAL) return false
+        privilegeScope.launch {
+            runCatching { PrivilegeManager.runShell("input keyevent 79") }
+        }
+        return true
+    }
 
     data class Result(val success: Boolean, val message: String)
 
@@ -34,11 +54,13 @@ object PhoneCallController {
                 Log.w(TAG, "TelecomManager.acceptRingingCall failed: ${t.message}")
             }
         }
-        return if (JarvisAccessibilityService.instance?.answerCallByUi() == true) {
-            Result(true, "Answered the incoming call from the call screen.")
-        } else {
-            Result(false, "No ringing call was found to answer.")
+        if (JarvisAccessibilityService.instance?.answerCallByUi() == true) {
+            return Result(true, "Answered the incoming call from the call screen.")
         }
+        if (privilegedHook()) {
+            return Result(true, "Answered the incoming call via shell input.")
+        }
+        return Result(false, "No ringing call was found to answer.")
     }
 
     @SuppressLint("MissingPermission")
@@ -55,11 +77,13 @@ object PhoneCallController {
                 Log.w(TAG, "TelecomManager.endCall failed: ${t.message}")
             }
         }
-        return if (JarvisAccessibilityService.instance?.endCallByUi() == true) {
-            Result(true, "Ended the call from the call screen.")
-        } else {
-            Result(false, "No active call was found to end.")
+        if (JarvisAccessibilityService.instance?.endCallByUi() == true) {
+            return Result(true, "Ended the call from the call screen.")
         }
+        if (privilegedHook()) {
+            return Result(true, "Ended the call via shell input.")
+        }
+        return Result(false, "No active call was found to end.")
     }
 
     fun status(context: Context): Result {
