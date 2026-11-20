@@ -13,8 +13,10 @@ object AudioFilters {
     /**
      * One-pole high-pass RMS (mono PCM16, 16 kHz), normalised to 0..1.
      * Used to tell wind rumble (mostly < 100 Hz) from a human voice before a barge-in.
+     * A 200 Hz cutoff keeps the whole voice band (~200 Hz and up) while cutting 50 Hz
+     * rumble to about a quarter of its input level.
      */
-    fun highPassRms16k(pcm: ByteArray, cutoffHz: Float = 120f): Float {
+    fun highPassRms16k(pcm: ByteArray, cutoffHz: Float = 200f): Float {
         if (pcm.size < 4) return 0f
         val sampleRate = 16_000f
         val dt = 1f / sampleRate

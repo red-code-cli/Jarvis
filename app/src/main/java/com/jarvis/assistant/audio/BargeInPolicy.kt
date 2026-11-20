@@ -31,7 +31,7 @@ object BargeInPolicy {
         if (!s.graceElapsed) return Action.IGNORE
         if (s.consecutiveVoicedFrames < s.minFrames) return Action.IGNORE
         if (s.amplitude <= s.echoFloor) return Action.IGNORE
-        // Wind/rumble: strong broadband level but almost no energy above ~120 Hz.
+        // Wind/rumble: strong broadband level but almost no energy above ~200 Hz.
         val windFloor = maxOf(0.015f, s.echoFloor * 0.35f)
         if (s.highPassRms < windFloor) return Action.IGNORE
         if (!s.ownerVerificationRequired || s.ownerAlreadyVerified) return Action.INTERRUPT
