@@ -86,22 +86,31 @@ class SettingsFragment : Fragment() {
 
         // Owner Voice Profile Status
         val hasVoiceProfile = preferences.hasOwnerVoiceProfile()
+        val ownerVoiceOn = preferences.isOwnerVoiceEnabled
         if (hasVoiceProfile) {
-            binding.tvOwnerVoiceBadge.text = "ACTIVE"
-            binding.tvOwnerVoiceBadge.setTextColor(Color.parseColor("#10B981"))
-            binding.tvOwnerVoiceBadge.setBackgroundResource(R.drawable.bg_jarvis_status_badge_green)
-            binding.tvOwnerVoiceSubtitle.text = "Voice Profile Active • Only you can speak"
+            binding.tvOwnerVoiceBadge.text = if (ownerVoiceOn) "ACTIVE" else "PAUSED"
+            binding.tvOwnerVoiceBadge.setTextColor(Color.parseColor(if (ownerVoiceOn) "#10B981" else "#F59E0B"))
+            binding.tvOwnerVoiceBadge.setBackgroundResource(if (ownerVoiceOn) R.drawable.bg_jarvis_status_badge_green else R.drawable.bg_jarvis_status_badge)
+            binding.tvOwnerVoiceSubtitle.text = if (ownerVoiceOn) {
+                "Voice profile active • sirf aapki awaaz"
+            } else {
+                "Voice profile paused • owner-only OFF hai"
+            }
 
-            binding.tvProfileVoiceStatus.text = "VOICE ENROLLED"
-            binding.tvProfileVoiceStatus.setTextColor(Color.parseColor("#10B981"))
-            binding.chipProfileVoiceStatus.setBackgroundResource(R.drawable.bg_jarvis_status_badge_green)
+            binding.tvProfileVoiceStatus.text = if (ownerVoiceOn) "VOICE ENROLLED" else "VOICE PAUSED"
+            binding.tvProfileVoiceStatus.setTextColor(Color.parseColor(if (ownerVoiceOn) "#10B981" else "#F59E0B"))
+            binding.chipProfileVoiceStatus.setBackgroundResource(if (ownerVoiceOn) R.drawable.bg_jarvis_status_badge_green else R.drawable.bg_jarvis_status_badge)
             binding.ivProfileVoiceBadgeIcon.setImageResource(R.drawable.ic_verified_badge)
-            binding.ivProfileVoiceBadgeIcon.imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#10B981"))
+            binding.ivProfileVoiceBadgeIcon.imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor(if (ownerVoiceOn) "#10B981" else "#F59E0B"))
         } else {
             binding.tvOwnerVoiceBadge.text = "SETUP"
             binding.tvOwnerVoiceBadge.setTextColor(ContextCompat.getColor(requireContext(), R.color.accent_sapphire))
             binding.tvOwnerVoiceBadge.setBackgroundResource(R.drawable.bg_jarvis_status_badge)
-            binding.tvOwnerVoiceSubtitle.text = "Not enrolled • Tap to record voice profile"
+            binding.tvOwnerVoiceSubtitle.text = if (ownerVoiceOn) {
+                "Profile missing • fail-open hai, enroll karo"
+            } else {
+                "Enroll nahi hua • tap karke voice profile record karo"
+            }
 
             binding.tvProfileVoiceStatus.text = "ENROLL VOICE"
             binding.tvProfileVoiceStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.accent_sapphire))
@@ -207,9 +216,9 @@ class SettingsFragment : Fragment() {
         updateVoiceThresholdLabel()
         binding.rowOwnerVoiceThreshold.setOnClickListener {
             val labels = arrayOf(
-                "Strict — high security, may reject you in noise",
+                "Strict — high security, shor me aapko bhi reject kar sakta hai",
                 "Balanced — recommended",
-                "Relaxed — tolerates TV/background noise",
+                "Relaxed — TV/background noise tolerate karta hai",
             )
             val current = preferences.ownerVoiceThreshold
             val checked = when {
@@ -236,11 +245,10 @@ class SettingsFragment : Fragment() {
     private fun updateVoiceThresholdLabel() {
         val threshold = preferences.ownerVoiceThreshold
         binding.tvOwnerVoiceThresholdMode.text = when {
-            threshold <= com.jarvis.assistant.audio.OwnerVoiceManager.STRICT_THRESHOLD -> "Strict · high security"
-            threshold >= com.jarvis.assistant.audio.OwnerVoiceManager.RELAXED_THRESHOLD -> "Relaxed · noisy rooms"
+            threshold <= com.jarvis.assistant.audio.OwnerVoiceManager.STRICT_THRESHOLD -> "Strict · zyada security"
+            threshold >= com.jarvis.assistant.audio.OwnerVoiceManager.RELAXED_THRESHOLD -> "Relaxed · shor wale kamre"
             else -> "Balanced · recommended"
-        }
-    }
+        }    }
 
     private fun setupClickListeners() {
         // Profile Card -> Change Name

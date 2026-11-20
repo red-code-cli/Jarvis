@@ -27,10 +27,32 @@ class AppPreferences(context: Context) {
         Log.e(TAG, "Secure API-key storage could not be initialized", e)
         null
     }
+
+    /**
+     * Speaker embeddings are biometric data. They live in their own AES-256 encrypted
+     * SharedPreferences file, separate from the API key. If the keystore is temporarily
+     * unavailable we fall back to the old plain file so an existing profile is never lost.
+     */
+    private val secureVoicePrefs: SharedPreferences? = try {
+        val masterKey = MasterKey.Builder(context.applicationContext)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context.applicationContext,
+            ENCRYPTED_VOICE_PREF_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        Log.e(TAG, "Encrypted voiceprint storage could not be initialized; using legacy storage", e)
+        null
+    }
     private val gson = Gson()
 
     init {
         migrateApiKeyToEncryptedStorage()
+        migrateVoiceProfileToEncryptedStorage()
         val current = prefs.getString(KEY_MODEL, null)
         if (current == null || current !in GeminiConstants.SUPPORTED_MODELS) {
             prefs.edit().putString(KEY_MODEL, GeminiConstants.DEFAULT_MODEL).apply()
@@ -40,6 +62,7 @@ class AppPreferences(context: Context) {
     companion object {
         private const val PREF_NAME = "jarvis_prefs"
         private const val ENCRYPTED_API_PREF_NAME = "jarvis_secure_api_prefs"
+        private const val ENCRYPTED_VOICE_PREF_NAME = "jarvis_secure_voice_prefs"
         private const val TAG = "AppPreferences"
         private const val KEY_API_KEY = "key_api_key"
         private const val KEY_MODEL = "key_model"
@@ -153,15 +176,45 @@ class AppPreferences(context: Context) {
         get() = prefs.getLong(KEY_VOICE_ENROLL_PROMPT_AT, 0L)
         set(value) = prefs.edit().putLong(KEY_VOICE_ENROLL_PROMPT_AT, value).apply()
 
+    /** Reads a biometric blob from the encrypted store first, then the legacy plain store. */
+    private fun readVoiceString(key: String): String? {
+        val encrypted = secureVoicePrefs?.getString(key, null)
+        if (!encrypted.isNullOrBlank()) return encrypted
+        return prefs.getString(key, null)
+    }
+
+    /** Copies any pre-upgrade plaintext voiceprint into encrypted storage exactly once. */
+    private fun migrateVoiceProfileToEncryptedStorage() {
+        val secure = secureVoicePrefs ?: return
+        try {
+            if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return
+            val legacyProfile = prefs.getString(KEY_OWNER_VOICE_PROFILE, null)
+            val legacySamples = prefs.getString(KEY_OWNER_VOICE_SAMPLES, null)
+            if (legacyProfile.isNullOrBlank()) return
+            if (!secure.getString(KEY_OWNER_VOICE_PROFILE, null).isNullOrBlank()) {
+                // Already migrated earlier; just remove the plaintext copy.
+                prefs.edit().remove(KEY_OWNER_VOICE_PROFILE).remove(KEY_OWNER_VOICE_SAMPLES).apply()
+                return
+            }
+            val editor = secure.edit().putString(KEY_OWNER_VOICE_PROFILE, legacyProfile)
+            if (!legacySamples.isNullOrBlank()) editor.putString(KEY_OWNER_VOICE_SAMPLES, legacySamples)
+            if (editor.commit()) {
+                prefs.edit().remove(KEY_OWNER_VOICE_PROFILE).remove(KEY_OWNER_VOICE_SAMPLES).apply()
+                Log.i(TAG, "Voiceprint migrated to encrypted storage")
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Voiceprint encryption migration skipped: ${t.message}")
+        }
+    }
+
     fun hasOwnerVoiceProfile(): Boolean {
         if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return false
-        val str = prefs.getString(KEY_OWNER_VOICE_PROFILE, null)
-        return !str.isNullOrBlank()
+        return !readVoiceString(KEY_OWNER_VOICE_PROFILE).isNullOrBlank()
     }
 
     fun getOwnerVoiceProfile(): FloatArray? {
         if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return null
-        val json = prefs.getString(KEY_OWNER_VOICE_PROFILE, null) ?: return null
+        val json = readVoiceString(KEY_OWNER_VOICE_PROFILE) ?: return null
         return try {
             val arr = org.json.JSONArray(json)
             FloatArray(arr.length()) { i -> arr.getDouble(i).toFloat() }
@@ -172,7 +225,7 @@ class AppPreferences(context: Context) {
 
     fun getOwnerVoiceSamples(): List<FloatArray> {
         if (prefs.getInt(KEY_OWNER_VOICE_FORMAT, 1) < OWNER_VOICE_FORMAT_SHERPA) return emptyList()
-        val json = prefs.getString(KEY_OWNER_VOICE_SAMPLES, null) ?: return emptyList()
+        val json = readVoiceString(KEY_OWNER_VOICE_SAMPLES) ?: return emptyList()
         return try {
             val root = org.json.JSONArray(json)
             val list = mutableListOf<FloatArray>()
@@ -202,12 +255,25 @@ class AppPreferences(context: Context) {
             samplesArr.put(arr)
         }
 
-        prefs.edit()
-            .putString(KEY_OWNER_VOICE_PROFILE, masterArr.toString())
-            .putString(KEY_OWNER_VOICE_SAMPLES, samplesArr.toString())
+        val editor = prefs.edit()
             .putInt(KEY_OWNER_VOICE_SAMPLE_COUNT, sampleVectors.size)
             .putInt(KEY_OWNER_VOICE_FORMAT, OWNER_VOICE_FORMAT_SHERPA)
             .putBoolean(KEY_OWNER_VOICE_ENABLED, true)
+        val secure = secureVoicePrefs
+        if (secure != null) {
+            val saved = secure.edit()
+                .putString(KEY_OWNER_VOICE_PROFILE, masterArr.toString())
+                .putString(KEY_OWNER_VOICE_SAMPLES, samplesArr.toString())
+                .commit()
+            if (saved) {
+                editor.remove(KEY_OWNER_VOICE_PROFILE).remove(KEY_OWNER_VOICE_SAMPLES).apply()
+                return
+            }
+            Log.w(TAG, "Encrypted voiceprint save failed; keeping a functional legacy copy")
+        }
+        editor
+            .putString(KEY_OWNER_VOICE_PROFILE, masterArr.toString())
+            .putString(KEY_OWNER_VOICE_SAMPLES, samplesArr.toString())
             .apply()
     }
 
@@ -216,12 +282,21 @@ class AppPreferences(context: Context) {
         for (v in profile) {
             arr.put(v.toDouble())
         }
-        prefs.edit()
-            .putString(KEY_OWNER_VOICE_PROFILE, arr.toString())
+        val editor = prefs.edit()
             .putInt(KEY_OWNER_VOICE_SAMPLE_COUNT, sampleCount)
             .putInt(KEY_OWNER_VOICE_FORMAT, OWNER_VOICE_FORMAT_SHERPA)
             .putBoolean(KEY_OWNER_VOICE_ENABLED, true)
-            .apply()
+        val secure = secureVoicePrefs
+        if (secure != null) {
+            val saved = secure.edit()
+                .putString(KEY_OWNER_VOICE_PROFILE, arr.toString())
+                .commit()
+            if (saved) {
+                editor.remove(KEY_OWNER_VOICE_PROFILE).apply()
+                return
+            }
+        }
+        editor.putString(KEY_OWNER_VOICE_PROFILE, arr.toString()).apply()
     }
 
     fun clearOwnerVoiceProfile() {
@@ -232,6 +307,10 @@ class AppPreferences(context: Context) {
             .remove(KEY_OWNER_VOICE_FORMAT)
             .putBoolean(KEY_OWNER_VOICE_ENABLED, false)
             .apply()
+        secureVoicePrefs?.edit()
+            ?.remove(KEY_OWNER_VOICE_PROFILE)
+            ?.remove(KEY_OWNER_VOICE_SAMPLES)
+            ?.apply()
     }
 
     var apiKey: String

@@ -330,6 +330,7 @@ class JarvisConversationService : Service() {
     private var lastPlaybackEndTime = 0L
     private var hasSpeechInCurrentUtterance = false
     private var hasSignalledUtteranceEnd = false
+    @Volatile
     private var consecutiveVoicedFrames = 0
     private var totalVoicedFramesInCurrentUtterance = 0
     private var ambientNoiseFloor = 0.03f
@@ -362,6 +363,13 @@ class JarvisConversationService : Service() {
     private val voiceGateBuffer = java.util.ArrayDeque<ByteArray>(64)
     @Volatile
     private var voiceGateOpen = true
+
+    /** Rolling assistant-playback-time audio used to speaker-verify a barge-in. */
+    private val bargeInAudio = java.io.ByteArrayOutputStream()
+    @Volatile
+    private var bargeInVerificationInFlight = false
+    @Volatile
+    private var lastBargeInRejectedAt = 0L
 
     private val conversationMemory by lazy {
         com.jarvis.assistant.memory.ConversationMemoryStore(applicationContext)
@@ -1891,6 +1899,11 @@ class JarvisConversationService : Service() {
                         (_conversationState.value == ConversationState.SPEAKING)
 
                 if (isSpeakerActive) {
+                    // Keep a bounded analysis copy of what the mic heard during playback. It is
+                    // never streamed; it is only used to confirm the barge-in speaker.
+                    synchronized(bargeInAudio) {
+                        if (bargeInAudio.size() < 40_000) bargeInAudio.write(chunk)
+                    }
                     // Barge-in works on speaker and headset. The recorder already has
                     // hardware AEC + noise suppression, so require the user's voice to
                     // clearly beat BOTH the room's adaptive noise floor AND the residual
@@ -1921,38 +1934,67 @@ class JarvisConversationService : Service() {
                     )
                     if (graceElapsed && amplitude > echoFloor) {
                         consecutiveVoicedFrames++
-                        if (consecutiveVoicedFrames >= minFrames) {
-                            Log.i(
-                                "JarvisService",
-                                "Voice barge-in: sustained speech over assistant (amp=$amplitude, " +
-                                    "floor=$echoFloor, frames=$consecutiveVoicedFrames, mode=$interruptSensitivity)"
+                        val action = com.jarvis.assistant.audio.BargeInPolicy.decide(
+                            com.jarvis.assistant.audio.BargeInPolicy.Snapshot(
+                                ownerVerificationRequired = ownerVerificationRequired(),
+                                ownerAlreadyVerified = isCurrentTurnOwnerVoiceVerified,
+                                graceElapsed = graceElapsed,
+                                amplitude = amplitude,
+                                echoFloor = echoFloor,
+                                highPassRms = com.jarvis.assistant.audio.AudioFilters.highPassRms16k(chunk),
+                                consecutiveVoicedFrames = consecutiveVoicedFrames,
+                                minFrames = minFrames,
+                                verificationInFlight = bargeInVerificationInFlight,
+                                rejectedRecently = now - lastBargeInRejectedAt < 3_000L
                             )
-                            isBargingIn = true
-                            audioPlayer?.flush()
-                            try { tts?.stop() } catch (_: Exception) {}
-                            setConversationState(ConversationState.LISTENING)
-                            lastUserSpeechDetectedTime = now
-                            hasSpeechInCurrentUtterance = true
-                            hasSignalledUtteranceEnd = false
-                            currentTurnUserText.clear()
-                            currentTurnAssistantText.clear()
-                            _liveUserTranscript.value = ""
-                            _liveAssistantResponse.value = ""
-                            hasExecutedCommandInCurrentTurn = false
-                            totalVoicedFramesInCurrentUtterance = minFrames
-                            synchronized(currentUtteranceAudioStream) {
-                                currentUtteranceAudioStream.reset()
-                                currentUtteranceAudioStream.write(chunk)
+                        )
+                        when (action) {
+                            com.jarvis.assistant.audio.BargeInPolicy.Action.INTERRUPT -> {
+                                beginBargeIn(chunk, now, minFrames)
+                                return@AudioRecorder
                             }
-                            isCurrentTurnOwnerVoiceVerified =
-                                !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()
-                            voiceGateOpen = !ownerVerificationRequired()
-                            synchronized(voiceGateBuffer) { voiceGateBuffer.clear() }
-                            serviceScope.launch {
-                                delay(700L)
-                                isBargingIn = false
+                            com.jarvis.assistant.audio.BargeInPolicy.Action.VERIFY -> {
+                                bargeInVerificationInFlight = true
+                                val snapshot = synchronized(bargeInAudio) { bargeInAudio.toByteArray() }
+                                serviceScope.launch(Dispatchers.Default) {
+                                    val match = if (snapshot.size >= com.jarvis.assistant.audio.SherpaVoiceprint.MIN_BYTES) {
+                                        com.jarvis.assistant.audio.OwnerVoiceManager.verifySpeakerAudio(snapshot, preferences)
+                                    } else {
+                                        null
+                                    }
+                                    val allow = match != null && com.jarvis.assistant.audio.BargeInPolicy
+                                        .verificationAllowsInterrupt(match.isMatch, match.hasExtractedVector)
+                                    withContext(Dispatchers.Main) {
+                                        bargeInVerificationInFlight = false
+                                        val stillSpeaking = audioPlayer?.isPlaying() == true ||
+                                            _conversationState.value == ConversationState.SPEAKING
+                                        if (allow && stillSpeaking && _isSessionOn.value) {
+                                            Log.i(
+                                                "JarvisService",
+                                                "Barge-in owner verified (dist=${match?.distance}, " +
+                                                    "sim=${match?.similarityPercent}%)."
+                                            )
+                                            beginBargeIn(chunk, System.currentTimeMillis(), minFrames)
+                                        } else {
+                                            lastBargeInRejectedAt = System.currentTimeMillis()
+                                            consecutiveVoicedFrames = 0
+                                            synchronized(bargeInAudio) { bargeInAudio.reset() }
+                                            Log.i(
+                                                "JarvisService",
+                                                "Barge-in ignored: speaker not verified " +
+                                                    "(hasVector=${match?.hasExtractedVector})."
+                                            )
+                                        }
+                                    }
+                                }
+                                return@AudioRecorder
                             }
-                            return@AudioRecorder
+                            com.jarvis.assistant.audio.BargeInPolicy.Action.IGNORE -> {
+                                // Below the sustained/echo/high-pass bar; keep accumulating.
+                                if (consecutiveVoicedFrames < minFrames) {
+                                    // fall through to the return below
+                                }
+                            }
                         }
                     } else {
                         consecutiveVoicedFrames = 0
@@ -1960,6 +2002,12 @@ class JarvisConversationService : Service() {
                     // While the assistant is physically speaking, don't stream raw mic
                     // audio to Gemini; the barge-in path above starts the new turn.
                     return@AudioRecorder
+                }
+
+                // Speaker is silent again: the analysis buffer is only meaningful for the
+                // current playback, so drop it instead of growing across turns.
+                synchronized(bargeInAudio) {
+                    if (bargeInAudio.size() > 0) bargeInAudio.reset()
                 }
 
                 // Stream user speech to Gemini Live.
@@ -4232,6 +4280,41 @@ class JarvisConversationService : Service() {
     }
 
     private var currentFocusRequest: Any? = null
+
+    /**
+     * Commits a verified barge-in: stops Jarvis's own playback and starts a fresh listening
+     * turn with the interrupting audio. Runs on the audio thread for an already-verified
+     * owner, or on Main after an asynchronous speaker match.
+     */
+    private fun beginBargeIn(chunk: ByteArray, now: Long, minFrames: Int) {
+        Log.i("JarvisService", "Voice barge-in accepted (minFrames=$minFrames)")
+        isBargingIn = true
+        audioPlayer?.flush()
+        try { tts?.stop() } catch (_: Exception) {}
+        setConversationState(ConversationState.LISTENING)
+        lastUserSpeechDetectedTime = now
+        hasSpeechInCurrentUtterance = true
+        hasSignalledUtteranceEnd = false
+        currentTurnUserText.clear()
+        currentTurnAssistantText.clear()
+        _liveUserTranscript.value = ""
+        _liveAssistantResponse.value = ""
+        hasExecutedCommandInCurrentTurn = false
+        totalVoicedFramesInCurrentUtterance = minFrames
+        synchronized(currentUtteranceAudioStream) {
+            currentUtteranceAudioStream.reset()
+            currentUtteranceAudioStream.write(chunk)
+        }
+        isCurrentTurnOwnerVoiceVerified =
+            !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()
+        voiceGateOpen = !ownerVerificationRequired()
+        synchronized(voiceGateBuffer) { voiceGateBuffer.clear() }
+        synchronized(bargeInAudio) { bargeInAudio.reset() }
+        serviceScope.launch {
+            delay(700L)
+            isBargingIn = false
+        }
+    }
 
     private fun requestAudioDuckFocus() {
         try {

@@ -33,13 +33,20 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
     private val preferences by lazy { JarvisApp.instance.preferences }
 
     private val samplePrompts = listOf(
-        "\"Hey Jarvis, wake up\"",
-        "\"Jarvis, turn on the flashlight\"",
-        "\"Jarvis, what is the weather today?\""
+        "\"Jarvis, subah 7 baje alarm lagao\"",
+        "\"Jarvis, aaj mausam kaisa hai?\"",
+        "\"Jarvis, WhatsApp kholo aur message padho\""
     )
 
     private val recordedVectors = mutableListOf<FloatArray>()
     private var currentSampleIndex = 0
+    private var captureNoiseSuppressor: android.media.audiofx.NoiseSuppressor? = null
+    private var maxDurationStopScheduled = false
+
+    private companion object {
+        /** 8 s at 16 kHz mono PCM16 — hard cap so a forgotten recording cannot grow forever. */
+        const val MAX_SAMPLE_BYTES = 16_000 * 2 * 8
+    }
 
     private var isRecording = false
     private var isTesting = false
@@ -83,17 +90,19 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
         val isEnabled = preferences.isOwnerVoiceEnabled && hasProfile
 
         binding.switchOwnerOnly.isChecked = isEnabled
-        binding.switchOwnerOnly.isEnabled = hasProfile
+        // Always tappable: a user with a broken/legacy profile must be able to switch
+        // owner-only mode OFF without enrolling first.
+        binding.switchOwnerOnly.isEnabled = true
 
         if (hasProfile) {
             binding.tvEnrollmentStatus.text = if (isEnabled) "OWNER VOICE: ACTIVE" else "OWNER VOICE: PAUSED"
             binding.tvEnrollmentStatus.setTextColor(getColor(if (isEnabled) R.color.primary_cyan else R.color.text_secondary))
-            binding.tvStatusDescription.text = "Jarvis is calibrated to your voice. Any speech or commands from other people are automatically blocked."
+            binding.tvStatusDescription.text = "Jarvis aapki awaaz pe calibrated hai. Doosre logon ki speech ignore hogi."
             binding.viewStatusDot.setBackgroundResource(if (isEnabled) R.drawable.circle_cyan else R.drawable.circle_cyan)
         } else {
-            binding.tvEnrollmentStatus.text = "OWNER VOICE: NOT ENROLLED"
+            binding.tvEnrollmentStatus.text = "OWNER VOICE: ENROLL NAHI HUA"
             binding.tvEnrollmentStatus.setTextColor(getColor(R.color.status_amber))
-            binding.tvStatusDescription.text = "Enroll 3 voice samples below. Once saved, Jarvis will respond ONLY to you and ignore anyone else."
+            binding.tvStatusDescription.text = "Neeche 3 samples enroll karo. Save hone ke baad Jarvis sirf aapki awaaz sunega."
         }
 
         // Sensitivity
@@ -109,15 +118,15 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
 
     private fun updateEnrollmentStepUI() {
         if (currentSampleIndex < samplePrompts.size) {
-            binding.tvStepIndicator.text = "TRAIN STEP ${currentSampleIndex + 1} OF 3"
+            binding.tvStepIndicator.text = "TRAIN STEP ${currentSampleIndex + 1} OF ${samplePrompts.size}"
             binding.tvPromptPhrase.text = samplePrompts[currentSampleIndex]
-            binding.btnRecordSample.text = "TAP & SPEAK PHRASE"
-            binding.tvRecordFeedback.text = "Tap to start recording sample ${currentSampleIndex + 1}"
+            binding.btnRecordSample.text = "TAP KARKE PHRASE BOLO"
+            binding.tvRecordFeedback.text = "Sample ${currentSampleIndex + 1} record karne ke liye tap karo"
         } else {
             binding.tvStepIndicator.text = "ENROLLMENT COMPLETE"
-            binding.tvPromptPhrase.text = "All 3 samples registered!"
-            binding.btnRecordSample.text = "RE-RECORD SAMPLES"
-            binding.tvRecordFeedback.text = "Owner voice profile is active and secured."
+            binding.tvPromptPhrase.text = "Teeno samples save ho gaye!"
+            binding.btnRecordSample.text = "SAMPLES DOBARA RECORD KARO"
+            binding.tvRecordFeedback.text = "Owner voice profile active aur encrypted hai."
         }
 
         // Dot indicators
@@ -138,6 +147,12 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         binding.switchOwnerOnly.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked && !preferences.hasOwnerVoiceProfile()) {
+                // Fail-open by design: never leave the switch on with no profile.
+                binding.switchOwnerOnly.isChecked = false
+                Toast.makeText(this, "Pehle apni awaaz enroll karo, phir owner-only ON karo.", Toast.LENGTH_LONG).show()
+                return@setOnCheckedChangeListener
+            }
             preferences.isOwnerVoiceEnabled = isChecked
             setupUI()
         }
@@ -170,19 +185,19 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
                 R.id.rbBalanced -> preferences.ownerVoiceThreshold = OwnerVoiceManager.DEFAULT_THRESHOLD
                 R.id.rbRelaxed -> preferences.ownerVoiceThreshold = OwnerVoiceManager.RELAXED_THRESHOLD
             }
-            Toast.makeText(this, "Sensitivity updated", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Sensitivity update ho gayi", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnClearProfile.setOnClickListener {
             MaterialAlertDialogBuilder(this)
-                .setTitle("Reset Voice Profile?")
-                .setMessage("This will remove your enrolled voiceprint. Jarvis will respond to all voices until you re-train.")
+                .setTitle("Voice profile reset karein?")
+                .setMessage("Aapka enrolled voiceprint delete ho jayega. Jab tak dobara enroll nahi karte, Jarvis sabki awaaz sunega.")
                 .setPositiveButton("RESET") { _, _ ->
                     preferences.clearOwnerVoiceProfile()
                     recordedVectors.clear()
                     currentSampleIndex = 0
                     setupUI()
-                    Toast.makeText(this, "Voice profile cleared", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Voice profile clear ho gaya", Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("CANCEL", null)
                 .show()
@@ -197,32 +212,46 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
         }
 
         isRecording = true
+        maxDurationStopScheduled = false
         binding.btnRecordSample.text = "STOP & PROCESS"
         binding.btnRecordSample.setBackgroundColor(getColor(R.color.status_amber))
-        binding.tvRecordFeedback.text = "Listening... Speak the phrase above now!"
+        binding.tvRecordFeedback.text = "Sun raha hoon... abhi phrase bolo!"
 
         startAudioCapture { pcmChunk ->
-            recordingBuffer.write(pcmChunk)
+            var reachedMax = false
+            synchronized(recordingBuffer) {
+                recordingBuffer.write(pcmChunk)
+                reachedMax = recordingBuffer.size() >= MAX_SAMPLE_BYTES
+            }
+            if (reachedMax && !maxDurationStopScheduled) {
+                maxDurationStopScheduled = true
+                runOnUiThread { if (isRecording) stopRecordingSample() }
+            }
         }
     }
 
     private fun stopRecordingSample() {
+        if (!isRecording) return
         isRecording = false
         stopAudioCapture()
 
-        val pcmAudio = recordingBuffer.toByteArray()
-        recordingBuffer.reset()
+        val pcmAudio = synchronized(recordingBuffer) {
+            val data = recordingBuffer.toByteArray()
+            recordingBuffer.reset()
+            data
+        }
 
-        if (pcmAudio.size < com.jarvis.assistant.audio.SherpaVoiceprint.MIN_BYTES) {
+        val quality = com.jarvis.assistant.audio.EnrollmentQuality.evaluate(pcmAudio)
+        if (!quality.ok) {
             binding.btnRecordSample.isEnabled = true
             binding.btnRecordSample.setBackgroundColor(getColor(R.color.primary_cyan))
-            binding.tvRecordFeedback.text = "Recording was too short. Please speak the full phrase and tap Stop."
+            binding.tvRecordFeedback.text = quality.hinglishMessage()
             binding.btnRecordSample.text = "RETRY SAMPLE ${currentSampleIndex + 1}"
             return
         }
 
         binding.btnRecordSample.isEnabled = false
-        binding.tvRecordFeedback.text = "Analyzing vocal acoustic signature..."
+        binding.tvRecordFeedback.text = "Awaaz ka acoustic signature nikaal raha hoon..."
 
         lifecycleScope.launch(Dispatchers.Default) {
             val vector = OwnerVoiceManager.extractSpeakerVector(pcmAudio)
@@ -241,17 +270,17 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
                         if (masterProfile != null) {
                             preferences.saveOwnerVoiceProfile(masterProfile, recordedVectors)
                             preferences.isOwnerVoiceEnabled = true
-                            Toast.makeText(this@VoiceEnrollmentActivity, "Voice profile trained successfully!", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@VoiceEnrollmentActivity, "Voice profile train ho gaya!", Toast.LENGTH_LONG).show()
                             setupUI()
                         } else {
-                            Toast.makeText(this@VoiceEnrollmentActivity, "Failed to average voice vectors. Please retry.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@VoiceEnrollmentActivity, "Voice vectors average nahi ho paye. Dobara try karo.", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-                        Toast.makeText(this@VoiceEnrollmentActivity, "Sample ${currentSampleIndex} saved! Say next phrase.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@VoiceEnrollmentActivity, "Sample ${currentSampleIndex} save! Ab agla phrase bolo.", Toast.LENGTH_SHORT).show()
                         updateEnrollmentStepUI()
                     }
                 } else {
-                    binding.tvRecordFeedback.text = "Could not detect clear speech. Please speak louder and retry."
+                    binding.tvRecordFeedback.text = "Saaf speech detect nahi hui. Thoda loud aur clear bolke dobara try karo."
                     binding.btnRecordSample.text = "RETRY SAMPLE ${currentSampleIndex + 1}"
                 }
             }
@@ -278,16 +307,20 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
         binding.layoutTestResult.visibility = View.GONE
 
         startAudioCapture { pcmChunk ->
-            recordingBuffer.write(pcmChunk)
+            synchronized(recordingBuffer) { recordingBuffer.write(pcmChunk) }
         }
     }
 
     private fun stopTestingVoice() {
+        if (!isTesting) return
         isTesting = false
         stopAudioCapture()
 
-        val pcmAudio = recordingBuffer.toByteArray()
-        recordingBuffer.reset()
+        val pcmAudio = synchronized(recordingBuffer) {
+            val data = recordingBuffer.toByteArray()
+            recordingBuffer.reset()
+            data
+        }
 
         binding.btnTestVoice.text = "TEST VOICE MATCH (SPEAK NOW)"
         val tvAccent = android.util.TypedValue()
@@ -298,9 +331,9 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
 
         if (pcmAudio.size < com.jarvis.assistant.audio.SherpaVoiceprint.MIN_BYTES) {
             binding.layoutTestResult.visibility = View.VISIBLE
-            binding.tvTestVerdict.text = "RECORDING TOO SHORT"
+            binding.tvTestVerdict.text = "RECORDING BAHUT CHHOTI"
             binding.tvTestVerdict.setTextColor(getColor(R.color.status_amber))
-            binding.tvTestDetails.text = "Please speak a full sentence (at least 1-2 seconds) to verify voice match."
+            binding.tvTestDetails.text = "Voice match ke liye poora sentence bolo (kam se kam 1-2 second)."
             return
         }
 
@@ -313,14 +346,18 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
                 binding.btnTestVoice.isEnabled = true
                 binding.layoutTestResult.visibility = View.VISIBLE
 
-                if (result.isMatch) {
+                if (!result.hasExtractedVector) {
+                    binding.tvTestVerdict.text = "MODEL READY NAHI HAI"
+                    binding.tvTestVerdict.setTextColor(getColor(R.color.status_amber))
+                    binding.tvTestDetails.text = "Speaker model download/warm-up me hai. Thodi der baad dobara test karo."
+                } else if (result.isMatch) {
                     binding.tvTestVerdict.text = "VERIFIED: OWNER (${result.similarityPercent}% MATCH)"
                     binding.tvTestVerdict.setTextColor(getColor(R.color.status_green))
-                    binding.tvTestDetails.text = "Voice matched! Jarvis will accept commands. (Distance: ${String.format(Locale.ROOT, "%.2f", result.distance)}, Threshold: ${result.threshold})"
+                    binding.tvTestDetails.text = "Awaaz match ho gayi! Jarvis aapke commands accept karega. (Distance: ${String.format(Locale.ROOT, "%.2f", result.distance)}, Threshold: ${result.threshold})"
                 } else {
                     binding.tvTestVerdict.text = "REJECTED: UNKNOWN VOICE (${result.similarityPercent}% MATCH)"
                     binding.tvTestVerdict.setTextColor(getColor(R.color.status_red))
-                    binding.tvTestDetails.text = "Non-owner voice detected! Jarvis will ignore. (Distance: ${String.format(Locale.ROOT, "%.2f", result.distance)}, Threshold: ${result.threshold})"
+                    binding.tvTestDetails.text = "Awaaz owner se match nahi hui. Jarvis ignore karega. (Distance: ${String.format(Locale.ROOT, "%.2f", result.distance)}, Threshold: ${result.threshold})"
                 }
             }
         }
@@ -352,6 +389,17 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                // Apply the user's background-noise filter to enrollment too, so a noisy room
+                // does not poison the averaged voiceprint.
+                val filterEnabled = try {
+                    preferences.isNoiseFilterEnabled
+                } catch (_: Throwable) { true }
+                if (filterEnabled && android.media.audiofx.NoiseSuppressor.isAvailable()) {
+                    captureNoiseSuppressor = runCatching {
+                        android.media.audiofx.NoiseSuppressor.create(record.audioSessionId)?.apply { enabled = true }
+                    }.getOrNull()
+                }
+
                 record.startRecording()
                 audioRecord = record
 
@@ -370,18 +418,31 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
                     audioRecord?.release()
                 } catch (_: Exception) {}
                 audioRecord = null
+                runCatching { captureNoiseSuppressor?.release() }
+                captureNoiseSuppressor = null
             }
         }
     }
 
     private fun stopAudioCapture() {
-        recordingJob?.cancel()
+        val job = recordingJob
         recordingJob = null
+        job?.cancel()
         try {
             audioRecord?.stop()
+        } catch (_: Exception) {}
+        // Let the blocking read leave native code before the record is released.
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.withTimeoutOrNull(250L) { job?.join() }
+            }
+        }
+        try {
             audioRecord?.release()
         } catch (_: Exception) {}
         audioRecord = null
+        runCatching { captureNoiseSuppressor?.release() }
+        captureNoiseSuppressor = null
     }
 
     override fun onDestroy() {
