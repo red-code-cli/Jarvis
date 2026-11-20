@@ -49,28 +49,26 @@ jobs:
           # A PR may read the cache main wrote, but must not poison it for the release job.
           cache-read-only: true
 
-      # One Gradle invocation so configuration and dependency resolution are shared.
-      # Compiling androidTest checks the Room migration test still builds; no APK here.
-      - name: Unit tests + compile both modules + androidTest compile
+      # One Gradle invocation shares configuration, dependency resolution, up-to-date checks and
+      # the build cache, so already-completed work is never redone and the daemon starts once.
+      # Compiling androidTest checks the Room migration test still builds; R8 uses the release
+      # keep rules so a missing ProGuard rule fails BEFORE merge. No APK is produced here.
+      - name: Unit tests, compile, lint and R8 shrink check (no APK)
         run: |
+          set +e
           sh ./gradlew --no-daemon \
             :app:compileDebugKotlin \
             :app:compileDebugAndroidTestKotlin \
-            testDebugUnitTest
-
-      - name: Lint
-        run: |
-          sh ./gradlew --no-daemon :app:lintDebug
+            testDebugUnitTest \
+            :app:lintDebug \
+            :app:minifyReleaseWithR8
+          status=$?
           report="app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt"
           if [ -f "$report" ]; then
             echo "==== LINT ERRORS ===="
             grep -nE ": Error:" "$report" | head -60 || true
           fi
-
-      # R8 with the release keep rules, so a missing ProGuard rule fails BEFORE merge.
-      # This does not package an APK (the single release APK is built only on main).
-      - name: Release shrink check (R8, no APK)
-        run: sh ./gradlew --no-daemon :app:minifyReleaseWithR8
+          exit $status
 
   release:
     name: Build the single signed APK and publish the release

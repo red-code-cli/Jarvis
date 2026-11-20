@@ -238,6 +238,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigationDock()
         selectPage(currentPage, animate = false)
         observeViewModel()
+        startForceUpdateObserver()
 
         // Jarvis's open_settings tool can ask for a specific category.
         intent?.getStringExtra(EXTRA_SETTINGS_CATEGORY)?.let { category ->
@@ -281,7 +282,6 @@ class MainActivity : AppCompatActivity() {
             recreate()
             return
         }
-        startForceUpdateObserver()
         if (enforceForceUpdateIfNeeded()) return
         maybeCheckForUpdates()
     }
