@@ -590,7 +590,8 @@ class AppPreferences(context: Context) {
         val secure = secureNotificationPrefs ?: return false
         return try {
             val raw = secure.getString(KEY_NOTIFICATION_DENIED_PACKAGES, null) ?: return false
-            val map = gson.fromJson(raw, object : TypeToken<Map<String, Boolean>>() {}.type)
+            val map: Map<String, Boolean>? =
+                gson.fromJson(raw, object : TypeToken<Map<String, Boolean>>() {}.type)
             map?.get(pkg) == true
         } catch (_: Throwable) {
             false
@@ -602,7 +603,7 @@ class AppPreferences(context: Context) {
         val secure = secureNotificationPrefs ?: return
         try {
             val raw = secure.getString(KEY_NOTIFICATION_DENIED_PACKAGES, null)
-            val map = raw?.let {
+            val map: MutableMap<String, Boolean> = raw?.let {
                 gson.fromJson(it, object : TypeToken<MutableMap<String, Boolean>>() {}.type)
             } ?: mutableMapOf()
             if (denied) map[pkg] = true else map.remove(pkg)
