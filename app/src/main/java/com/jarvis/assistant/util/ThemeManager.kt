@@ -19,12 +19,14 @@ object ThemeManager {
     }
 
     fun getThemeBgColor(themeKey: String, customHex: String?): Int {
-        return when (themeKey) {
-            "dark" -> Color.parseColor("#070914")
-            "red" -> Color.parseColor("#0E0307")
-            "sunset" -> Color.parseColor("#FFF0EA")
-            "custom" -> try { Color.parseColor(customHex ?: "#FFFFFF") } catch (_: Exception) { Color.WHITE }
-            else -> Color.parseColor("#E7EEF9")
+        if (themeKey == ThemeRegistry.CUSTOM_KEY) {
+            return try { Color.parseColor(customHex ?: "#FFFFFF") } catch (_: Exception) { Color.WHITE }
+        }
+        val theme = ThemeRegistry.byKey(themeKey)
+        return if (theme != null) {
+            try { Color.parseColor(theme.bgColor) } catch (_: Exception) { Color.parseColor("#E7EEF9") }
+        } else {
+            Color.parseColor("#E7EEF9")
         }
     }
 
@@ -32,18 +34,25 @@ object ThemeManager {
         val prefs = try { JarvisApp.instance.preferences } catch (_: Exception) { null }
         val themeKey = prefs?.appTheme ?: "light"
 
-        val (themeRes, isLightStatusBar, bgColor) = when (themeKey) {
-            "dark" -> Triple(R.style.Theme_JarvisAssistant_Dark, false, Color.parseColor("#070914"))
-            "red" -> Triple(R.style.Theme_JarvisAssistant_Red, false, Color.parseColor("#0E0307"))
-            "sunset" -> Triple(R.style.Theme_JarvisAssistant_Sunset, true, Color.parseColor("#FFF0EA"))
-            "custom" -> {
+        val (themeRes, isLightStatusBar, bgColor) = when {
+            themeKey == ThemeRegistry.CUSTOM_KEY -> {
                 val customHex = prefs?.customThemeColor ?: "#FFFFFF"
                 val parsedColor = try { Color.parseColor(customHex) } catch (_: Exception) { Color.WHITE }
                 val light = isLight(parsedColor)
                 val res = if (light) R.style.Theme_JarvisAssistant_CustomLight else R.style.Theme_JarvisAssistant_CustomDark
                 Triple(res, light, parsedColor)
             }
-            else -> Triple(R.style.Theme_JarvisAssistant_Light, true, Color.parseColor("#E7EEF9"))
+            else -> {
+                val theme = ThemeRegistry.byKey(themeKey)
+                val fallback = Triple(
+                    R.style.Theme_JarvisAssistant_Light, true, Color.parseColor("#E7EEF9")
+                )
+                if (theme == null) fallback else Triple(
+                    theme.styleRes,
+                    theme.lightStatusBar,
+                    try { Color.parseColor(theme.bgColor) } catch (_: Exception) { Color.parseColor("#E7EEF9") }
+                )
+            }
         }
 
         activity.setTheme(themeRes)

@@ -9,6 +9,13 @@ fun configuredValue(name: String): String? =
 
 fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
+// ── Optional release overrides (CI only) ────────────────────────────────────
+// The release workflow passes -PversionCodeOverride / -PversionNameOverride so the
+// APK can be cut from a tag or a manual dispatch without editing this file. The
+// override is strictly validated, so a stale or malformed value can never ship.
+val overrideVersionCode = providers.gradleProperty("versionCodeOverride").orNull?.toIntOrNull()
+val overrideVersionName = providers.gradleProperty("versionNameOverride").orNull
+
 // ── Stable signing identity ──────────────────────────────────────────────────
 // Past releases were built with `assembleDebug`, and AGP generated a NEW debug keystore on
 // every CI run. Each release therefore had a different certificate and Android refused to
@@ -40,8 +47,8 @@ android {
         applicationId = "com.jarvis.assistant"
         minSdk = 26
         targetSdk = 34
-        versionCode = 162
-        versionName = "1.16.0"
+        versionCode = overrideVersionCode ?: 162
+        versionName = overrideVersionName ?: "1.16.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEVELOPER_NAME", buildConfigString(developerName.ifBlank { "Unverified developer" }))

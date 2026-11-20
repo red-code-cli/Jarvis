@@ -41,11 +41,29 @@ object HarnessLogSheet {
         val subtitle = view.findViewById<TextView>(R.id.tvHarnessLogSubtitle)
         val container = view.findViewById<LinearLayout>(R.id.layoutHarnessLog)
         val scroll = view.findViewById<ScrollView>(R.id.scrollHarnessLog)
+        val btnRetry = view.findViewById<TextView>(R.id.btnHarnessRetry)
+        val btnPause = view.findViewById<TextView>(R.id.btnHarnessPause)
+        val btnCancel = view.findViewById<TextView>(R.id.btnHarnessCancel)
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
         var limit = PAGE_SIZE
         var lastSeq = 0L
+
+        btnRetry.setOnClickListener { engine.retryNow(taskId) }
+        btnPause.setOnClickListener {
+            val live = engine.liveStatus.value
+            val failed = live.phase == com.jarvis.harness.HarnessLiveStatus.Phase.ERROR
+            val paused =
+                live.state == "PAUSED" ||
+                    live.state == "INTERRUPTED" ||
+                    live.phase == com.jarvis.harness.HarnessLiveStatus.Phase.WAITING_RETRY
+            if (failed || paused) engine.resumeTask(taskId) else engine.pauseTask(taskId)
+        }
+        btnCancel.setOnClickListener {
+            JarvisHarnessBridge.requestCancel(context)
+            dialog.dismiss()
+        }
 
         fun renderAll() {
             container.removeAllViews()
@@ -69,6 +87,18 @@ object HarnessLogSheet {
                 status?.provider?.let { append(" · ").append(it) }
                 status?.error?.let { append("\n").append(it.headline).append(" — ").append(it.hint) }
             }
+            val live = engine.liveStatus.value
+            val phase = live.phase
+            val done = phase == com.jarvis.harness.HarnessLiveStatus.Phase.SUCCESS
+            val failed = phase == com.jarvis.harness.HarnessLiveStatus.Phase.ERROR
+            val paused =
+                live.state == "PAUSED" ||
+                    live.state == "INTERRUPTED" ||
+                    phase == com.jarvis.harness.HarnessLiveStatus.Phase.WAITING_RETRY
+            btnRetry.visibility = if (failed) View.VISIBLE else View.GONE
+            btnPause.visibility = if (done || failed) View.GONE else View.VISIBLE
+            btnPause.text = if (paused) "CONTINUE" else "RUKO"
+            btnCancel.visibility = if (done) View.GONE else View.VISIBLE
         }
 
         renderAll()

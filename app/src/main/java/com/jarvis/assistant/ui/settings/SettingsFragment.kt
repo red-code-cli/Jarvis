@@ -204,12 +204,11 @@ class SettingsFragment : Fragment() {
         binding.tvCurrentModel.text = "$modelDisplay • Live WebSocket"
 
         // Theme
-        binding.tvCurrentTheme.text = when (preferences.appTheme) {
-            "dark" -> "Dark Theme"
-            "red" -> "Red Theme"
-            "sunset" -> "Sunset Theme"
-            "custom" -> "Custom (${preferences.customThemeColor})"
-            else -> "Ice Blue Theme"
+        val themeKey = preferences.appTheme
+        binding.tvCurrentTheme.text = if (themeKey == com.jarvis.assistant.util.ThemeRegistry.CUSTOM_KEY) {
+            "Custom (${preferences.customThemeColor})"
+        } else {
+            com.jarvis.assistant.util.ThemeRegistry.displayName(themeKey)
         }
     }
 
