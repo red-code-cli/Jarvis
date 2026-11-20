@@ -13,8 +13,8 @@ fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").
 // The release workflow passes -PversionCodeOverride / -PversionNameOverride so the
 // APK can be cut from a tag or a manual dispatch without editing this file. The
 // override is strictly validated, so a stale or malformed value can never ship.
-val defaultVersionCode = 162
-val defaultVersionName = "1.17.1"
+val defaultVersionCode = 164
+val defaultVersionName = "1.17.2"
 val overrideVersionCode = providers.gradleProperty("versionCodeOverride").orNull?.toIntOrNull()
 val overrideVersionName = providers.gradleProperty("versionNameOverride").orNull
 
