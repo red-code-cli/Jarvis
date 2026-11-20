@@ -1699,6 +1699,78 @@
                 app:tint="?attr/themeTextMuted" />
         </LinearLayout>
 
+        <!-- Orb animation style -->
+        <LinearLayout
+            android:id="@+id/rowOrbStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Orb style"
+                    android:src="@drawable/ic_settings_orb"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Orb animation style"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Neural orb ka animation character badlo"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvCurrentOrbStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="120dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Holographic Plasma"
+                android:textColor="?attr/themeAccent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
         <!-- Table Guard / Anti-Theft Alarm -->
         <LinearLayout
             android:id="@+id/rowAntiTheftAlarm"

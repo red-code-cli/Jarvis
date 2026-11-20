@@ -2031,9 +2031,10 @@ class JarvisConversationService : Service() {
 
                 // Dynamic voice threshold: respects user's background noise filter setting with fast detection
                 val noiseFilterOn = preferences.isNoiseFilterEnabled
-                val effectiveMinThreshold = if (noiseFilterOn) 0.028f else VAD_MIN_THRESHOLD
-                val effectiveMultiplier = if (noiseFilterOn) 1.5f else VAD_NOISE_MULTIPLIER
-                val effectiveStartFrames = if (noiseFilterOn) 3 else 2
+                // Raised defaults: background sounds (TV, traffic, fans) must NOT trigger speech start.
+                val effectiveMinThreshold = if (noiseFilterOn) 0.045f else VAD_MIN_THRESHOLD
+                val effectiveMultiplier = if (noiseFilterOn) 1.8f else VAD_NOISE_MULTIPLIER
+                val effectiveStartFrames = if (noiseFilterOn) 4 else 2
                 val voiceThreshold = maxOf(effectiveMinThreshold, ambientNoiseFloor * effectiveMultiplier)
 
                 if (amplitude > voiceThreshold) {
@@ -4073,15 +4074,16 @@ class JarvisConversationService : Service() {
             return
         }
 
-        // The free sherpa-onnx wake + speaker models are downloaded on first use.
-        if (!WakeModelDownloader.isReady(applicationContext)) {
+        // The free sherpa-onnx wake model is bundled as a fallback but kept downloadable. The
+        // speaker model is NOT gated here — without it, owner verification simply fails open.
+        if (!WakeModelDownloader.wakeModelReady(applicationContext)) {
             if (wakeModelSetupInFlight) return
             if (System.currentTimeMillis() - wakeModelSetupFailedAt < WAKE_MODEL_RETRY_MS) return
             wakeModelSetupInFlight = true
             startWakeWatchdog()
             serviceScope.launch {
                 val ready = try {
-                    WakeModelDownloader.ensureModels(applicationContext)
+                    WakeModelDownloader.ensureWakeModels(applicationContext)
                 } catch (t: Throwable) {
                     Log.e("JarvisService", "Wake model download failed: ${t.message}", t)
                     false

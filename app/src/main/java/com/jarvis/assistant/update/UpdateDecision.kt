@@ -11,21 +11,22 @@ enum class UpdateAction { NONE, OPTIONAL, FORCE }
  *  - no manifest / latest <= installed  -> NONE (fail-open, downgrade block)
  *  - mandatory && installed < latest    -> FORCE
  *  - installed < minSupportedVersionCode-> FORCE (even if not marked mandatory)
- *  - a version the user skipped         -> NONE (only for optional updates; FORCE always wins)
  *  - otherwise                          -> OPTIONAL
+ *
+ * The user-skipped version is intentionally ignored: the update prompt must keep
+ * appearing (on every app open) until the user actually updates.
  */
 object UpdateDecision {
     fun decide(
         installedVersionCode: Int,
         manifest: UpdateManifest?,
-        skippedVersionCode: Int,
+        @Suppress("UNUSED_PARAMETER") skippedVersionCode: Int,
     ): UpdateAction {
         if (manifest == null) return UpdateAction.NONE
         if (manifest.latestVersionCode <= installedVersionCode) return UpdateAction.NONE
         val belowMinimum =
             manifest.minSupportedVersionCode > 0 && installedVersionCode < manifest.minSupportedVersionCode
         if (manifest.mandatory || belowMinimum) return UpdateAction.FORCE
-        if (skippedVersionCode == manifest.latestVersionCode) return UpdateAction.NONE
         return UpdateAction.OPTIONAL
     }
 }

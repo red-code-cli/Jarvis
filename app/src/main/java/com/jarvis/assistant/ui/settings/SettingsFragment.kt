@@ -23,6 +23,7 @@ import com.jarvis.assistant.R
 import com.jarvis.assistant.data.model.GeminiConstants
 import com.jarvis.assistant.databinding.FragmentSettingsBinding
 import com.jarvis.assistant.ui.home.MainActivity
+import com.jarvis.assistant.ui.home.HomeFragment
 import com.jarvis.assistant.ui.permission.PermissionActivity
 import com.jarvis.assistant.ui.voice.VoiceEnrollmentActivity
 
@@ -210,6 +211,9 @@ class SettingsFragment : Fragment() {
         } else {
             com.jarvis.assistant.util.ThemeRegistry.displayName(themeKey)
         }
+
+        // Orb animation style
+        binding.tvCurrentOrbStyle.text = com.jarvis.assistant.util.OrbStyleRegistry.displayName(preferences.orbAnimation)
     }
 
     private fun setupCategoryJump() {
@@ -581,6 +585,10 @@ class SettingsFragment : Fragment() {
             ThemeSelectionBottomSheet.newInstance().show(childFragmentManager, ThemeSelectionBottomSheet.TAG)
         }
 
+        binding.rowOrbStyle.setOnClickListener {
+            showOrbStyleDialog()
+        }
+
         binding.rowPrivacyPolicy.setOnClickListener {
             startActivity(Intent(requireContext(), PrivacyShieldActivity::class.java))
         }
@@ -621,6 +629,30 @@ class SettingsFragment : Fragment() {
                 val chosen = languages[which]
                 preferences.language = chosen
                 binding.tvCurrentLanguage.text = chosen
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showOrbStyleDialog() {
+        val styles = com.jarvis.assistant.util.OrbStyleRegistry.ALL
+        val labels = styles.map { it.name }.toTypedArray()
+        val currentIndex = styles.indexOfFirst { it.key == preferences.orbAnimation }.let { if (it >= 0) it else 0 }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Orb Animation Style")
+            .setMessage("Neural orb ka animation character chuno. Home screen par turant dikhega.")
+            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
+                val style = styles[which]
+                preferences.orbAnimation = style.key
+                binding.tvCurrentOrbStyle.text = style.name
+                (activity as? MainActivity)?.let { main ->
+                    main.supportFragmentManager.fragments
+                        .filterIsInstance<HomeFragment>()
+                        .firstOrNull()
+                        ?.setOrbStyle(style.key)
+                }
                 dialog.dismiss()
             }
             .setNegativeButton("Cancel", null)
