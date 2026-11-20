@@ -74,6 +74,19 @@ object OwnerVoiceManager {
     }
 
     /**
+     * Loads the speaker-embedding model ahead of time so the first wake after entering standby
+     * does not pay the (heavy) model-init cost on the wake path. Safe to call repeatedly and
+     * off the main thread; a no-op when the model is not downloaded yet.
+     */
+    fun warmUp() {
+        try {
+            voiceprint()
+        } catch (t: Throwable) {
+            Log.w(TAG, "Speaker model pre-warm failed: ${t.message}")
+        }
+    }
+
+    /**
      * Calculates the cosine distance between two speaker embedding vectors:
      * distance = 1.0 - (dot(v1, v2) / (norm(v1) * norm(v2)))
      * Range is [0.0, 2.0]. Lower values indicate identical vocal characteristics.
