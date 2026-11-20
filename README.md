@@ -9,7 +9,7 @@ An Android voice assistant built with Kotlin, Gemini Live, on-device voice compo
 - Minimum Android version: Android 8.0 (API 26)
 - Compile and target SDK: 34
 - Java/Kotlin target: 17
-- Current app version: 1.14.3 (version code 159)
+- Current app version: 1.15.1 (version code 161)
 
 ## Getting started
 
@@ -67,6 +67,7 @@ The certificate fingerprint must be calculated from the same key used to sign th
 │       │   ├── harness/         Adapter that connects Jarvis to :harness-core
 │       │   ├── network/         Gemini Live transport
 │       │   ├── ui/              Activities, fragments, and adapters
+│       │   ├── update/          In-app auto update (manifest, verify, install)
 │       │   ├── util/            Shared app utilities
 │       │   └── vision/          Screen capture and visual task execution
 │       ├── assets/              Bundled web UI and offline voice models
@@ -77,7 +78,9 @@ The certificate fingerprint must be calculated from the same key used to sign th
 │   └── third_party/                        proot, libandroid-shmem, talloc
 ├── docs/
 │   ├── architecture/            Design notes and research
-│   └── diagnostics/             User-provided issue recordings and index
+│   ├── diagnostics/             User-provided issue recordings and index
+│   └── in-app-update.md         Update publishing guide (Hinglish)
+├── scripts/                     Helper scripts (update.json generator)
 ├── gradle/                      Gradle wrapper configuration
 ├── build.gradle.kts             Root Gradle plugin declarations
 ├── settings.gradle.kts          Project and repository configuration
@@ -105,9 +108,55 @@ See [`harness-core/README.md`](harness-core/README.md) for the module's public A
 how to reuse it in another app. `harness-core/NOTICE.md` covers third-party licences
 (PRoot is GPL-2.0).
 
+## In-app auto update (force update)
+
+Users no longer have to grab a new APK by hand: the app checks for updates itself,
+shows an in-app update screen, and downloads, verifies and installs the new build
+inside the app.
+
+- **Where the check runs:** on app start/resume (throttled), a WorkManager job every
+  6 hours (network-connected, battery-friendly), and a **Check now** button in
+  **Settings → Updates**. The existing "What's new in Jarvis" content stays on that
+  screen; the live update card is added above it.
+- **Optional vs forced:** a normal update shows *Later* / *Update karo*. A manifest
+  with `mandatory: true` (or an installed build older than `minSupportedVersionCode`)
+  locks Jarvis — wake word, orb, chat and automation cannot start a new session — until
+  the update is installed. Emergency voice SOS ("Code Red"), voice call pick/cut and
+  guard phrases keep working while locked. Back button cannot bypass the force screen.
+- **Security:** HTTPS only (plain HTTP and redirect-to-HTTP are rejected); the APK is
+  installed only after SHA-256, package name (`com.jarvis.assistant`) and signing
+  certificate all match; a hash or signer mismatch deletes the file and stops.
+  Downgrades are blocked. The updater **fails open**: if the manifest is unreachable or
+  invalid, the app keeps working instead of locking the user out.
+- **Silent install (optional):** if Root or Shizuku is already enabled, the update is
+  installed silently via `pm install`; otherwise it falls back to the standard Android
+  installer (`REQUEST_INSTALL_PACKAGES`).
+
+### Publishing an update
+
+1. Bump `versionCode` (and `versionName`) in `app/build.gradle.kts` and build the APK
+   with the **same keystore** (`app/keystore/jarvis-release.jks`) — a different signer
+   cannot over-install.
+2. Generate the manifest with [`scripts/make_update_json.sh`](scripts/make_update_json.sh)
+   (or the `.ps1` on Windows); it computes the SHA-256, size and version fields.
+3. Upload the APK and `update.json` to the GitHub Release. The update URL is a single
+   source of truth: `UPDATE_MANIFEST_URL` in `app/build.gradle.kts` (default points at
+   the latest GitHub Release's `update.json`).
+4. Set `mandatory` to `true` to force the update, or `false` for optional.
+
+FCM "instant push" (topic `app-update`) is intentionally not wired up yet because the
+project has no `google-services.json`; the feature works fully without it. See
+[`docs/in-app-update.md`](docs/in-app-update.md) for the full guide (Hinglish) and the
+FCM setup steps.
+
+> Note: builds released before this feature do not check for updates, so the first
+> build that includes it must be installed manually once. Every update after that can
+> arrive in-app.
+
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [In-app auto update guide](docs/in-app-update.md)
 - [Voice architecture research](docs/architecture/voice-architecture-research.md)
 - [Voice issue recordings](docs/diagnostics/voice-videos/README.md)
 
