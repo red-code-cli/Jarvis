@@ -1,0 +1,173 @@
+name: Android Build & Release
+
+on:
+  push:
+    branches: [main]
+  # Pull requests never produce an APK: they only run unit tests, lint, compile checks and
+  # R8 minification so a broken change is caught before the single release build.
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Tests, lint and compile (no APK)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install NDK and CMake
+        run: |
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          sdkmanager_bin="$(ls -1 "$sdk_root"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | tail -1)"
+          if [ -z "$sdkmanager_bin" ]; then
+            echo "sdkmanager not found under $sdk_root" >&2
+            exit 1
+          fi
+          yes | "$sdkmanager_bin" --licenses > /dev/null || true
+          "$sdkmanager_bin" --install "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - name: Set up Gradle (dependency + build cache)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # A PR may read the cache main wrote, but must not poison it for the release job.
+          cache-read-only: true
+
+      # One Gradle invocation so configuration and dependency resolution are shared.
+      # Compiling androidTest checks the Room migration test still builds; no APK here.
+      - name: Unit tests + compile both modules + androidTest compile
+        run: |
+          sh ./gradlew --no-daemon \
+            :app:compileDebugKotlin \
+            :app:compileDebugAndroidTestKotlin \
+            testDebugUnitTest
+
+      - name: Lint
+        run: |
+          sh ./gradlew --no-daemon :app:lintDebug
+          report="app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt"
+          if [ -f "$report" ]; then
+            echo "==== LINT ERRORS ===="
+            grep -nE ": Error:" "$report" | head -60 || true
+          fi
+
+      # R8 with the release keep rules, so a missing ProGuard rule fails BEFORE merge.
+      # This does not package an APK (the single release APK is built only on main).
+      - name: Release shrink check (R8, no APK)
+        run: sh ./gradlew --no-daemon :app:minifyReleaseWithR8
+
+  release:
+    name: Build the single signed APK and publish the release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install NDK and CMake
+        run: |
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          sdkmanager_bin="$(ls -1 "$sdk_root"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | tail -1)"
+          if [ -z "$sdkmanager_bin" ]; then
+            echo "sdkmanager not found under $sdk_root" >&2
+            exit 1
+          fi
+          yes | "$sdkmanager_bin" --licenses > /dev/null || true
+          "$sdkmanager_bin" --install "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - name: Set up Gradle (dependency + build cache)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          gradle-home-cache-cleanup: true
+
+      - name: Read version
+        id: version
+        run: |
+          v=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts | head -1)
+          c=$(grep -oP 'versionCode = \K[0-9]+' app/build.gradle.kts | head -1)
+          if [ -z "$v" ] || [ -z "$c" ]; then echo "version not found" >&2; exit 1; fi
+          echo "name=$v" >> "$GITHUB_OUTPUT"
+          echo "code=$c" >> "$GITHUB_OUTPUT"
+          echo "Release version: $v ($c)"
+
+      # The only APK build for this release. Signed with the committed stable keystore
+      # (or JARVIS_RELEASE_* secrets when present) and minified with R8.
+      - name: Build the single release APK (signed, R8)
+        run: sh ./gradlew --no-daemon assembleRelease
+
+      - name: Collect release APK and checksum
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/*.apk "out/jarvis-v${{ steps.version.outputs.name }}.apk"
+          cd out && sha256sum *.apk | tee checksums.txt
+
+      - name: Verify signature and versionCode
+        run: |
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          build_tools="$(ls -1d "$sdk_root"/build-tools/* | sort -V | tail -1)"
+          apk="out/jarvis-v${{ steps.version.outputs.name }}.apk"
+          echo "== apksigner =="
+          "$build_tools/apksigner" verify --print-certs "$apk"
+          echo "== badging =="
+          "$build_tools/aapt" dump badging "$apk" | grep -E "package:|application-label:" | head -5
+          code="$("$build_tools/aapt" dump badging "$apk" | grep -oP "versionCode='\K[0-9]+" | head -1)"
+          test "$code" = "${{ steps.version.outputs.code }}" || { echo "versionCode mismatch: $code"; exit 1; }
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-release-apk
+          path: out/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.name }}
+          name: Jarvis v${{ steps.version.outputs.name }}
+          files: out/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            ## Jarvis v${{ steps.version.outputs.name }} (versionCode ${{ steps.version.outputs.code }})
+
+            Follow-up to v1.15.0 that completes the two items it did not cover.
+
+            ### B1 - truthful verification and counters
+            - Verification prefers the project root recorded in project memory and searches subfolders (depth 3) for the web entry file, so an `index.html` inside a project subfolder is found.
+            - Failure reasons now print `checked <path> (N files, depth <= 3)`.
+            - Files counter comes from a workspace walk (ground truth); it never stays at 0 while files exist, and event counts can no longer pull it down.
+            - Agent Live feed dedupes text (no more `Wrote index.htmlindex.html`) and truncates on word boundaries in both the live path and the restore path.
+            - A built-in static preview server is the finalize fallback, so a finished static site always opens in Jarvis Browser.
+
+            ### B6 - update without uninstall
+            - Stable committed signing identity (`app/keystore/jarvis-release.jks`); release builds are now signed with the same certificate every time.
+            - The release job builds `assembleRelease` (signed, R8) once and verifies the certificate and versionCode before publishing.
+            - Room schema test added alongside the exported schema.
+
+            > Signing note: builds before this one used ephemeral debug keys, so installing this build over one of those needs ONE uninstall. Every update after this one will over-install.

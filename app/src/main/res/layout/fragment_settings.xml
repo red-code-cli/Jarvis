@@ -1,0 +1,2341 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/settingsScroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/themeBg"
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="122dp">
+
+        <!-- Settings categories: jump straight to a section, layout and values unchanged -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipToPadding="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/catProfileVoice"
+                    style="@style/SettingsCategoryChip"
+                    android:text="PROFILE" />
+
+                <TextView
+                    android:id="@+id/catVoice"
+                    style="@style/SettingsCategoryChip"
+                    android:text="VOICE" />
+
+                <TextView
+                    android:id="@+id/catPhone"
+                    style="@style/SettingsCategoryChip"
+                    android:text="PHONE" />
+
+                <TextView
+                    android:id="@+id/catCoding"
+                    style="@style/SettingsCategoryChip"
+                    android:text="CODING" />
+
+                <TextView
+                    android:id="@+id/catAi"
+                    style="@style/SettingsCategoryChip"
+                    android:text="AI" />
+
+                <TextView
+                    android:id="@+id/catMemory"
+                    style="@style/SettingsCategoryChip"
+                    android:text="MEMORY" />
+
+                <TextView
+                    android:id="@+id/catAppearance"
+                    style="@style/SettingsCategoryChip"
+                    android:text="APPEARANCE" />
+
+                <TextView
+                    android:id="@+id/catPermissions"
+                    style="@style/SettingsCategoryChip"
+                    android:text="PERMISSIONS" />
+
+                <TextView
+                    android:id="@+id/catAbout"
+                    style="@style/SettingsCategoryChip"
+                    android:text="ABOUT" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Operator profile -->
+        <LinearLayout
+            android:id="@+id/cardProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_ref_card"
+            android:clickable="true"
+            android:elevation="3dp"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:layout_width="58dp"
+                    android:layout_height="58dp"
+                    android:background="@drawable/bg_ref_row_icon">
+
+                    <ImageView
+                        android:id="@+id/ivProfilePhoto"
+                        android:layout_width="58dp"
+                        android:layout_height="58dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_jarvis_avatar"
+                        android:clipToOutline="true"
+                        android:contentDescription="Change profile photo"
+                        android:padding="13dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_user_avatar"
+                        app:tint="?attr/themeAccent" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvProfileName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif-rounded"
+                        android:maxLines="1"
+                        android:text="Rehaan"
+                        android:textColor="?attr/themeTextPrimary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvProfileSubtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:letterSpacing="0.04"
+                        android:maxLines="1"
+                        android:text="JARVIS OPERATOR • PRIMARY USER"
+                        android:textColor="?attr/themeTextMuted"
+                        android:textSize="10sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:id="@+id/chipProfileVoiceStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="30dp"
+                            android:background="@drawable/bg_jarvis_status_badge"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="horizontal"
+                            android:paddingStart="9dp"
+                            android:paddingEnd="11dp">
+
+                            <ImageView
+                                android:id="@+id/ivProfileVoiceBadgeIcon"
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:contentDescription="Voice profile"
+                                android:src="@drawable/ic_settings_owner_voice" />
+
+                            <TextView
+                                android:id="@+id/tvProfileVoiceStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="5dp"
+                                android:text="ENROLL VOICE"
+                                android:textColor="?attr/themeAccent"
+                                android:textSize="9sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvProfilePersonaChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="30dp"
+                            android:layout_marginStart="7dp"
+                            android:background="@drawable/bg_ref_chip"
+                            android:gravity="center"
+                            android:paddingStart="11dp"
+                            android:paddingEnd="11dp"
+                            android:text="JARVIS"
+                            android:textColor="?attr/themeTextPrimary"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="Edit profile"
+                    android:src="@drawable/ic_edit"
+                    app:tint="?attr/themeTextMuted" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Owner voice -->
+        <LinearLayout
+            android:id="@+id/rowOwnerVoice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Owner voice"
+                    android:src="@drawable/ic_settings_owner_voice"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Owner voice"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvOwnerVoiceSubtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Not enrolled • Tap to record voice profile"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvOwnerVoiceBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_jarvis_status_badge"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
+                android:text="SETUP"
+                android:textColor="?attr/themeAccent"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Owner voice sensitivity: verification strictness per utterance -->
+        <LinearLayout
+            android:id="@+id/rowOwnerVoiceThreshold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Voice verification sensitivity"
+                    android:src="@drawable/ic_settings_owner_voice"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Voice verification"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvOwnerVoiceThresholdMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Balanced"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Language -->
+        <LinearLayout
+            android:id="@+id/rowLanguage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Language"
+                    android:src="@drawable/ic_settings_language"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Conversation language"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Jarvis kis bhasha me baat kare"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvCurrentLanguage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:ellipsize="end"
+                android:maxWidth="120dp"
+                android:maxLines="1"
+                android:text="Auto"
+                android:textColor="?attr/themeAccent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Persona & voice -->
+        <LinearLayout
+            android:id="@+id/rowPersonaVoice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Persona"
+                    android:src="@drawable/ic_settings_voice"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Persona &amp; voice"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvCurrentPersona"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Jarvis • Voice: Puck"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Silent execution -->
+        <LinearLayout
+            android:id="@+id/rowSilentMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Silent mode"
+                    android:src="@drawable/ic_settings_silent"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Silent execution"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Task narration band, baat-cheet chalu"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchSilentMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                app:useMaterialThemeColors="true" />
+        </LinearLayout>
+
+        <!-- Wake word sensitivity -->
+        <LinearLayout
+            android:id="@+id/rowWakeSensitivity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Wake Sensitivity"
+                    android:src="@drawable/ic_settings_wave"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Wake sensitivity"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvCurrentWakeSensitivity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Balanced • Standard room"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Persona wake words -->
+        <LinearLayout
+            android:id="@+id/rowWakeWords"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Wake words"
+                    android:src="@drawable/ic_mic_jarvis"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Wake words"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvCurrentWakeWords"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Jarvis • Isha • Virus"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Smart Battery Saver -->
+        <LinearLayout
+            android:id="@+id/rowBatterySaver"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Battery Saver"
+                    android:src="@drawable/ic_battery"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Smart battery saver"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Low battery (&lt;15%) ya pocket me mic pause"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchBatterySaver"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                app:useMaterialThemeColors="true" />
+        </LinearLayout>
+
+        <!-- Background Noise Filter -->
+        <LinearLayout
+            android:id="@+id/rowNoiseFilter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Noise Filter"
+                    android:src="@drawable/ic_settings_shield"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Background noise filter"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="TV, background chatter aur shor ko ignore kare"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchNoiseFilter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                app:useMaterialThemeColors="true" />
+        </LinearLayout>
+
+        <!-- Voice Call Answering (Pick / Cut hands-free) -->
+        <LinearLayout
+            android:id="@+id/rowVoiceCallAnswering"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Voice Call Control"
+                    android:src="@drawable/ic_settings_voice"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Voice call control (Pick/Cut)"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Call aane par 'Pick karo' ya 'Cut karo' bol kar call handle karein"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchVoiceCallAnswering"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                app:useMaterialThemeColors="true" />
+        </LinearLayout>
+
+        <!-- Unread Messages Voice Reader -->
+        <LinearLayout
+            android:id="@+id/rowUnreadMessages"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Unread Messages Reader"
+                    android:src="@drawable/ic_chat_bubble"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Unread messages voice reader"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="'WhatsApp padh ke sunao' bolne par naye unread messages sunaye"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchUnreadMessages"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                app:useMaterialThemeColors="true" />
+        </LinearLayout>
+
+        <!-- Shake to Talk -->
+        <LinearLayout
+            android:id="@+id/rowShakeToTalk"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Shake to talk"
+                    android:src="@drawable/ic_bolt"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Shake-to-Talk"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Phone ko 2 baar hilane par conversation shuru kare (Noisy jagah ke liye)"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchShakeToTalk"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                app:useMaterialThemeColors="true" />
+        </LinearLayout>
+
+        <!-- API connection -->
+        <LinearLayout
+            android:id="@+id/rowApiConnection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="API"
+                    android:src="@drawable/ic_settings_plug"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="API connection"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvCurrentModel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Gemini • Live WebSocket"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Memory -->
+        <LinearLayout
+            android:id="@+id/rowMemory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Memory"
+                    android:src="@drawable/ic_memory_head"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Yaadein"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Saved memories, backup &amp; restore"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Open"
+                android:textColor="?attr/themeAccent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Permissions -->
+        <LinearLayout
+            android:id="@+id/rowPermissions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Permissions"
+                    android:src="@drawable/ic_settings_shield"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Permissions"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Mic, location, overlay, accessibility"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Accessibility -->
+        <LinearLayout
+            android:id="@+id/rowAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Accessibility"
+                    android:src="@drawable/ic_accessibility"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Accessibility"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Screen reading and automatic actions"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Root & Shizuku -->
+        <LinearLayout
+            android:id="@+id/rowRootAccess"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Root and Shizuku"
+                    android:src="@drawable/ic_settings_shield"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Root &amp; Shizuku"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Privileged access for deep control"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Set as default launcher -->
+        <LinearLayout
+            android:id="@+id/rowDefaultLauncher"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Default launcher"
+                    android:src="@drawable/ic_nav_home"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Set as Default Launcher"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Use Jarvis as your home app"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Updates -->
+        <LinearLayout
+            android:id="@+id/rowUpdatesHub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Updates"
+                    android:src="@drawable/ic_nav_bell"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Updates"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="What's new in Jarvis"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Overlay avatars -->
+        <LinearLayout
+            android:id="@+id/rowOverlayAvatars"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Overlay avatar"
+                    android:src="@drawable/ic_settings_orb"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Overlay avatar"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Floating avatar, dock edge aur task progress"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Applications -->
+        <LinearLayout
+            android:id="@+id/rowApplications"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Applications"
+                    android:src="@drawable/ic_settings_apps"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Applications"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="WhatsApp, YouTube, calls aur app automation"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Theme -->
+        <LinearLayout
+            android:id="@+id/rowAppTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Theme"
+                    android:src="@drawable/ic_settings_palette"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="App theme"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Ice blue, dark, red, sunset ya custom"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvCurrentTheme"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="120dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Light Theme"
+                android:textColor="?attr/themeAccent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Table Guard / Anti-Theft Alarm -->
+        <LinearLayout
+            android:id="@+id/rowAntiTheftAlarm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Table Guard"
+                    android:src="@drawable/ic_settings_shield"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Table guard (Anti-Theft)"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Phone hilte hi siren bajaye aur Virus persona warning de"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchAntiTheftAlarm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                app:useMaterialThemeColors="true" />
+        </LinearLayout>
+
+        <!-- Emergency Voice SOS -->
+        <LinearLayout
+            android:id="@+id/rowEmergencySos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Emergency SOS"
+                    android:src="@drawable/ic_warning"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Emergency voice SOS"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="'Code Red' bolte hi live GPS location SMS aur WhatsApp kare"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchEmergencySos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                app:useMaterialThemeColors="true" />
+        </LinearLayout>
+
+        <!-- Emergency Contact Phone -->
+        <LinearLayout
+            android:id="@+id/rowEmergencyContact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Emergency Contact"
+                    android:src="@drawable/ic_settings_voice"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Emergency Contact Number"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="SOS alerts receive karne wala number"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvCurrentEmergencyContact"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="130dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Not configured"
+                android:textColor="?attr/themeAccent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Edit"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Privacy policy -->
+        <LinearLayout
+            android:id="@+id/rowPrivacyPolicy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Privacy"
+                    android:src="@drawable/ic_settings_lock"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Privacy Policy"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Data, screen vision aur permissions"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- App identity -->
+        <LinearLayout
+            android:id="@+id/rowAppIdentity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="App identity"
+                    android:src="@drawable/ic_user_profile"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="App identity"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Signature aur release verification"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Community -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_ref_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="14dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Jarvis community"
+                android:textColor="?attr/themeTextPrimary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/btnSocialTelegram"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_jarvis_social_btn"
+                android:contentDescription="Telegram"
+                android:padding="9dp"
+                android:src="@drawable/ic_social_telegram"
+                app:tint="?attr/themeAccent" />
+
+            <ImageButton
+                android:id="@+id/btnSocialInstagram"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_jarvis_social_btn"
+                android:contentDescription="Instagram"
+                android:padding="9dp"
+                android:src="@drawable/ic_social_instagram"
+                app:tint="?attr/themeAccent" />
+
+            <ImageButton
+                android:id="@+id/btnSocialYoutube"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_jarvis_social_btn"
+                android:contentDescription="YouTube"
+                android:padding="9dp"
+                android:src="@drawable/ic_social_youtube"
+                app:tint="?attr/themeAccent" />
+        </LinearLayout>
+
+        <!-- API Providers (coding engine). Separate from Jarvis's own AI Connection. -->
+        <LinearLayout
+            android:id="@+id/rowApiProviders"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="9dp"
+            android:background="@drawable/bg_ref_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="13dp">
+
+            <FrameLayout
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:background="@drawable/bg_ref_row_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="API Providers"
+                    android:src="@drawable/ic_settings_plug"
+                    app:tint="?attr/themeAccent" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="API Providers"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvApiProvidersSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="40+ providers for the coding engine"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="Open"
+                android:src="@drawable/ic_arrow_right"
+                app:tint="?attr/themeTextMuted" />
+        </LinearLayout>
+
+        <!-- Coding Engine (harness module). One card; expands in place. -->
+        <LinearLayout
+            android:id="@+id/cardCodingEngine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_ref_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_ref_row_icon">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="Coding engine"
+                        android:src="@drawable/ic_code_chip"
+                        app:tint="?attr/themeAccent" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Coding Engine"
+                        android:textColor="?attr/themeTextPrimary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Apps, websites aur scripts phone par hi banao"
+                        android:textColor="?attr/themeTextMuted"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvHarnessBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_jarvis_status_badge"
+                    android:paddingStart="10dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="5dp"
+                    android:text="NOT INSTALLED"
+                    android:textColor="?attr/themeAccent"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvHarnessStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="DeepSeek Harness agent + Ubuntu runtime install karein."
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="12sp" />
+
+            <ProgressBar
+                android:id="@+id/pbHarnessInstall"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="10dp"
+                android:max="100"
+                android:progress="0"
+                android:progressTint="?attr/themeAccent"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvHarnessBytes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="10sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/rowHarnessInstall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_ref_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="horizontal"
+                android:padding="13dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Install coding engine"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="INSTALL"
+                    android:textColor="?attr/themeAccent"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowHarnessUpdateAll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_ref_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="horizontal"
+                android:padding="13dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Update all to latest"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="UPDATE"
+                    android:textColor="?attr/themeAccent"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layoutHarnessAgents"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="RECENT TASKS"
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/layoutHarnessRecent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
+
+            <TextView
+                android:id="@+id/tvHarnessRecentEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Abhi koi coding task nahi chala."
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="11sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="CUSTOM API"
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Coding agent ka apna model key. Jarvis ki Gemini voice key alag rehti hai."
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="11sp" />
+
+            <LinearLayout
+                android:id="@+id/rowHarnessProvider"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_ref_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="horizontal"
+                android:padding="13dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Provider"
+                    android:textColor="?attr/themeTextPrimary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/tvHarnessProviderValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxWidth="180dp"
+                    android:text="Anthropic API"
+                    android:textColor="?attr/themeAccent"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/etHarnessEndpoint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_ref_input"
+                android:hint="Endpoint URL"
+                android:importantForAutofill="no"
+                android:inputType="textUri"
+                android:minHeight="44dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:textColor="?attr/themeTextPrimary"
+                android:textColorHint="?attr/themeTextMuted"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/etHarnessModel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_ref_input"
+                android:hint="Model name"
+                android:importantForAutofill="no"
+                android:inputType="text"
+                android:minHeight="44dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:textColor="?attr/themeTextPrimary"
+                android:textColorHint="?attr/themeTextMuted"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/etHarnessKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_ref_input"
+                android:hint="API key (encrypted)"
+                android:importantForAutofill="no"
+                android:inputType="textPassword"
+                android:minHeight="44dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:textColor="?attr/themeTextPrimary"
+                android:textColorHint="?attr/themeTextMuted"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/rowHarnessSaveApi"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_ref_row"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="SAVE"
+                        android:textColor="?attr/themeAccent"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/rowHarnessTestApi"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_ref_row"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="TEST CONNECTION"
+                        android:textColor="?attr/themeAccent"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvHarnessApiStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="11sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvFooterCredit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:paddingBottom="8dp"
+            android:text="Jarvis v1.8.7 • by Roshan"
+            android:textColor="?attr/themeTextMuted"
+            android:textSize="11sp" />
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_ref_scan"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <!-- Live camera feed; Jarvis receives throttled frames from this preview -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreview"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:alpha="0"
+        app:implementationMode="performance"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:scaleType="fillCenter" />
+
+    <!-- Real screen-share preview overlay; stays empty until Android delivers frames. -->
+    <ImageView
+        android:id="@+id/ivVisionPreview"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:alpha="0"
+        android:contentDescription="Live screen preview"
+        android:scaleType="centerCrop"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <View
+        android:id="@+id/visionShade"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#73071019"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- HUD header -->
+    <LinearLayout
+        android:id="@+id/visionHeader"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="22dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="22dp"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="7dp"
+                android:layout_height="7dp"
+                android:background="@drawable/bg_ref_dot_blue" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="9dp"
+                android:layout_weight="1"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.16"
+                android:text="JARVIS VISION"
+                android:textColor="#79C9FF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvVisionMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.10"
+                android:text="CAMERA"
+                android:textColor="#7FA6D9"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvVisionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:fontFamily="monospace"
+            android:text="STANDBY — camera khul raha hai…"
+            android:textColor="#7FA6D9"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvVisionHelp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:fontFamily="sans-serif"
+            android:lineSpacingExtra="2dp"
+            android:text="Camera khulte hi Jarvis live frames dekhta hai (session ON). Snap se photo bhejo; Share se screen bhi dikha sakte ho."
+            android:textColor="#526E8D"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <!-- Scanning reticle -->
+    <com.jarvis.assistant.ui.widget.VisionReticleView
+        android:id="@+id/visionReticle"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:importantForAccessibility="no"
+        app:layout_constraintBottom_toTopOf="@id/visionControls"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/visionHeader" />
+
+    <LinearLayout
+        android:id="@+id/visionTelemetry"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="22dp"
+        android:layout_marginBottom="18dp"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@id/visionControls"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/tvVisionFeed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.08"
+            android:text="FEED: OFFLINE"
+            android:textColor="#6FC8FF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvVisionSession"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.08"
+            android:text="SESSION: OFF"
+            android:textColor="#526E8D"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Real controls: session, snapshot, screen share -->
+    <LinearLayout
+        android:id="@+id/visionControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="104dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:id="@+id/btnScanSession"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingTop="10dp"
+            android:paddingBottom="6dp">
+
+            <FrameLayout
+                android:id="@+id/frameScanSession"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:background="@drawable/bg_ref_scan_circle">
+
+                <ImageView
+                    android:id="@+id/ivScanSession"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Voice session"
+                    android:src="@drawable/ic_mic_jarvis"
+                    app:tint="#6FC8FF" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvScanSession"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="9dp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.10"
+                android:text="SESSION"
+                android:textColor="#6FC8FF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btnScanSnap"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingTop="2dp"
+            android:paddingBottom="6dp">
+
+            <FrameLayout
+                android:id="@+id/frameScanSnap"
+                android:layout_width="86dp"
+                android:layout_height="86dp"
+                android:background="@drawable/bg_ref_mic"
+                android:elevation="8dp">
+
+                <ImageView
+                    android:id="@+id/ivScanSnap"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Send snapshot"
+                    android:src="@drawable/ic_camera"
+                    app:tint="#FFFFFF" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvScanSnap"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="9dp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.10"
+                android:text="SNAP"
+                android:textColor="#B8D9FF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btnScanShare"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingTop="10dp"
+            android:paddingBottom="6dp">
+
+            <FrameLayout
+                android:id="@+id/frameScanShare"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:background="@drawable/bg_ref_scan_circle">
+
+                <ImageView
+                    android:id="@+id/ivScanShare"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Share screen"
+                    android:src="@drawable/ic_screen_share"
+                    app:tint="#6FC8FF" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvScanShare"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="9dp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.10"
+                android:text="SHARE"
+                android:textColor="#6FC8FF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

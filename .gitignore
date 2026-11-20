@@ -1,0 +1,47 @@
+# Built Android artifacts
+*.apk
+*.ap_
+*.aab
+
+# JVM and Android generated files
+*.class
+*.dex
+bin/
+gen/
+out/
+build/
+.gradle/
+.gradle-user/
+.kotlin/
+buildOutputCleanup/
+.externalNativeBuild/
+.cxx/
+
+# Local machine configuration and secrets
+local.properties
+*.jks
+*.keystore
+# The ONE stable release signing identity is intentionally committed so every release shares
+# the same certificate and can over-install. See app/keystore/README.md.
+!app/keystore/jarvis-release.jks
+.env
+.env.*
+!.env.example
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.shelf/
+misc.xml
+deploymentTargetDropDown.xml
+
+# Local runtime database dumps (may contain personal memory data)
+dbtmp/
+
+# Logs and generated diagnostics
+*.log
+dump*.xml
+
+# OS files
+.DS_Store
+Thumbs.db

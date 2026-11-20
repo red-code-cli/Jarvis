@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/themeBg">
+
+    <TextView
+        android:id="@+id/tvChatTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="22dp"
+        android:layout_marginTop="4dp"
+        android:fontFamily="sans-serif"
+        android:text="Jarvis"
+        android:textColor="?attr/themeTextSecondary"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tvChatSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Gemini Live • READY"
+        android:textColor="?attr/themeTextMuted"
+        android:textSize="10sp"
+        app:layout_constraintStart_toStartOf="@id/tvChatTitle"
+        app:layout_constraintTop_toBottomOf="@id/tvChatTitle" />
+
+    <ImageButton
+        android:id="@+id/btnChatNew"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_ref_top_button"
+        android:contentDescription="New chat"
+        android:elevation="3dp"
+        android:padding="10dp"
+        android:src="@drawable/ic_plus"
+        app:layout_constraintBottom_toBottomOf="@id/tvChatSubtitle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tvChatTitle"
+        app:tint="?attr/themeAccent" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvChatMessages"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="10dp"
+        android:scrollbars="none"
+        app:layout_constraintBottom_toTopOf="@id/cardInputContainer"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvChatSubtitle" />
+
+    <LinearLayout
+        android:id="@+id/emptyChatState"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="42dp"
+        android:paddingEnd="42dp"
+        app:layout_constraintBottom_toBottomOf="@id/rvChatMessages"
+        app:layout_constraintTop_toTopOf="@id/rvChatMessages">
+
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:alpha="0.32"
+            android:contentDescription="Chat"
+            android:src="@drawable/ic_nav_chat"
+            app:tint="?attr/themeAccent" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:fontFamily="sans-serif-rounded"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:text="Jarvis se kuchh bhi poochho —\ntext likho, ya screen share karke dikhao."
+            android:textColor="?attr/themeTextPrimary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cardInputContainer"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="104dp"
+        android:background="@drawable/bg_ref_input"
+        android:elevation="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnAttach"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Share screen"
+            android:padding="10dp"
+            android:src="@drawable/ic_attach"
+            app:tint="?attr/themeTextPrimary" />
+
+        <EditText
+            android:id="@+id/etMessageInput"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@null"
+            android:fontFamily="sans-serif"
+            android:hint="Jarvis se kuchh bhi poochho…"
+            android:imeOptions="actionSend"
+            android:inputType="textCapSentences"
+            android:maxLines="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="6dp"
+            android:textColor="?attr/themeTextPrimary"
+            android:textColorHint="?attr/themeTextMuted"
+            android:textSize="16sp" />
+
+        <ImageButton
+            android:id="@+id/btnSendMessage"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_ref_blue_button"
+            android:contentDescription="Send"
+            android:padding="10dp"
+            android:src="@drawable/ic_send_up"
+            app:tint="#FFFFFF" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Workspace deliverables and built APKs handed to the system installer. -->
+    <files-path name="harness_files" path="." />
+    <cache-path name="harness_cache" path="." />
+    <external-files-path name="harness_external_files" path="." />
+</paths>

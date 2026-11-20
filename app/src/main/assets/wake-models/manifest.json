@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "note": "Official sherpa-onnx release assets (Apache-2.0). Downloaded on first use, never bundled in the APK. The exact asset names/folders are taken from the sherpa-onnx releases; verify the URLs before shipping if upstream renames them.",
+  "models": [
+    {
+      "id": "kws-gigaspeech",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2",
+      "archive": true,
+      "bytes": 0,
+      "readyMarker": "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01/tokens.txt"
+    },
+    {
+      "id": "speaker-campplus",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",
+      "archive": false,
+      "bytes": 0,
+      "readyMarker": "3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx"
+    }
+  ]
+}

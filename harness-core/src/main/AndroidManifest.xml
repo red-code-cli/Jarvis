@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manifest contributed by :harness-core.
+
+  Everything here is additive and namespaced under the `harness` prefix (authority,
+  notification channels, wake-lock tags, intent actions) so it cannot collide with the
+  host app's own components. The host app must still let this merge (no
+  tools:node="remove" on these names) and must add:
+    * app-level packaging { jniLibs { useLegacyPackaging = true } }
+    * app-level androidResources { noCompress += "zst" }
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <service
+            android:name="com.jarvis.harness.runtime.RuntimeExecutionService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started local coding task" />
+        </service>
+
+        <service
+            android:name="com.jarvis.harness.runtime.RuntimeSetupService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started installation of the local coding environment" />
+        </service>
+
+        <service
+            android:name="com.jarvis.harness.backup.BackupService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name="com.jarvis.harness.runtime.AndroidAppInstallReceiver"
+            android:exported="false" />
+
+        <!--
+          Dedicated authority for APKs and files the engine hands to the system installer.
+          The host app keeps its own provider untouched; this one is suffixed ".harness.files"
+          and the engine builds URIs from "${context.packageName}.harness.files".
+        -->
+        <provider
+            android:name="com.jarvis.harness.HarnessFileProvider"
+            android:authorities="${applicationId}.harness.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/harness_file_paths" />
+        </provider>
+    </application>
+</manifest>
