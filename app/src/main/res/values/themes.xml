@@ -631,11 +631,9 @@
     </style>
 
     <!-- Legacy style aliases -->
-    <style name="Theme.JarvisAssistant.PearlWhite" parent="Theme.JarvisAssistant.Light" />
     <style name="Theme.JarvisAssistant.MidnightOnyx" parent="Theme.JarvisAssistant.Dark" />
     <style name="Theme.JarvisAssistant.CyberpunkNeon" parent="Theme.JarvisAssistant.Dark" />
     <style name="Theme.JarvisAssistant.EmeraldObsidian" parent="Theme.JarvisAssistant.Dark" />
-    <style name="Theme.JarvisAssistant.RoseGold" parent="Theme.JarvisAssistant.Sunset" />
 
     <style name="SettingsCategoryChip">
         <item name="android:layout_width">wrap_content</item>

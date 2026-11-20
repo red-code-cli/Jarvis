@@ -48,7 +48,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = overrideVersionCode ?: 162
-        versionName = overrideVersionName ?: "1.16.0"
+        versionName = overrideVersionName ?: "1.17.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEVELOPER_NAME", buildConfigString(developerName.ifBlank { "Unverified developer" }))
