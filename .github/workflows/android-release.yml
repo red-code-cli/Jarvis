@@ -190,10 +190,10 @@ jobs:
           "$build_tools/aapt" dump badging "$apk" | grep -E "package:|application-label:" | head -5
           code="$("$build_tools/aapt" dump badging "$apk" | grep -oP "versionCode='\K[0-9]+" | head -1)"
           test "$code" = "${{ steps.version.outputs.code }}" || { echo "versionCode mismatch: $code"; exit 1; }
-          cert="$("$build_tools/apksigner" verify --print-certs "$apk" | grep -oP 'certificate SHA-256 digest:\s+\K[0-9A-F]+' | head -1 | tr -d ':')"
+          cert="$("$build_tools/apksigner" verify --print-certs "$apk" | grep -oP 'certificate SHA-256 digest:\s+\K[0-9a-fA-F]+' | head -1 | tr -d ':' | tr 'a-f' 'A-F')"
           expected="${EXPECTED_CERT:-}"
           if [ -z "$expected" ]; then
-            expected=$(grep -oP 'bundledCertSha256 = "\K[0-9A-F]+' app/build.gradle.kts)
+            expected=$(grep -oP 'bundledCertSha256 = "\K[0-9a-fA-F]+' app/build.gradle.kts)
           fi
           expected=$(echo "$expected" | tr -d ':' | tr 'a-f' 'A-F')
           echo "certificate=$cert expected=$expected"
