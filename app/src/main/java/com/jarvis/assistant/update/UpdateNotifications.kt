@@ -1,6 +1,7 @@
 package com.jarvis.assistant.update
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -22,6 +23,8 @@ object UpdateNotifications {
     private const val CHANNEL_ID = "jarvis_update"
     private const val NOTIFICATION_ID = 4201
 
+    // POST_NOTIFICATIONS is checked in canNotify() before we reach the notify() call.
+    @SuppressLint("MissingPermission")
     fun showUpdateAvailable(context: Context, manifest: UpdateManifest, mandatory: Boolean) {
         if (!canNotify(context)) return
         try {
