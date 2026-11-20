@@ -54,3 +54,11 @@
     public static int v(...);
     public static int i(...);
 }
+
+# ── In-App Auto Update ───────────────────────────────────────────────────────
+# WorkManager instantiates UpdateCheckWorker by class name and the manifest references
+# UpdateActivity by name; -repackageclasses would otherwise break those lookups.
+-keep class com.jarvis.assistant.update.UpdateCheckWorker { *; }
+-keep class com.jarvis.assistant.update.UpdateActivity { <init>(...); }
+-keep class com.jarvis.assistant.update.UpdateManifest { *; }
+-keepclassmembers class com.jarvis.assistant.update.** { *; }

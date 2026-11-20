@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/themeBg"
+    android:fitsSystemWindows="true">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:paddingTop="40dp"
+            android:paddingBottom="40dp">
+
+            <ImageView
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:layout_marginBottom="18dp"
+                android:contentDescription="@string/app_name"
+                android:src="@drawable/ic_jarvis_logo" />
+
+            <TextView
+                android:id="@+id/tvUpdateTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="?attr/themeTextPrimary"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:text="Update available" />
+
+            <TextView
+                android:id="@+id/tvUpdateVersionInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:textColor="?attr/themeAccent"
+                android:textSize="14sp"
+                android:text="Jarvis v0.0.0" />
+
+            <TextView
+                android:id="@+id/tvUpdateSize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center"
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="12sp"
+                android:text="" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_ref_card"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/themeTextMuted"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:text="Kya naya hai" />
+
+                <TextView
+                    android:id="@+id/tvUpdateNotes"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="3dp"
+                    android:textColor="?attr/themeTextSecondary"
+                    android:textSize="14sp"
+                    android:text="" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/progressUpdate"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:max="100"
+                android:progress="0"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvUpdateProgress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="12sp"
+                android:visibility="gone"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/tvUpdateStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:textColor="?attr/themeTextMuted"
+                android:textSize="12sp"
+                android:visibility="gone"
+                android:text="" />
+
+            <Button
+                android:id="@+id/btnUpdatePrimary"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="22dp"
+                android:backgroundTint="?attr/themeAccent"
+                android:textColor="?attr/themeBg"
+                android:textStyle="bold"
+                android:text="Update karo" />
+
+            <Button
+                android:id="@+id/btnUpdateLater"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="?attr/themeSurface"
+                android:textColor="?attr/themeTextSecondary"
+                android:text="Baad me"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

@@ -91,6 +91,11 @@ class JarvisApp : Application() {
         // Root + Shizuku privilege detection (real-time, non-blocking)
         com.jarvis.assistant.privilege.PrivilegeManager.init(this)
 
+        // In-app updater: restore any latched mandatory state before the first screen draws,
+        // then schedule the battery-friendly 6-hour periodic check (network-connected only).
+        com.jarvis.assistant.update.UpdateManager.primeFromStorage()
+        com.jarvis.assistant.update.UpdateScheduler.schedulePeriodic(this)
+
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             private var startedActivities = 0
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {
