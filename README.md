@@ -9,7 +9,7 @@ An Android voice assistant built with Kotlin, Gemini Live, on-device voice compo
 - Minimum Android version: Android 8.0 (API 26)
 - Compile and target SDK: 34
 - Java/Kotlin target: 17
-- Current app version: 1.15.1 (version code 161)
+- Current app version: 1.16.0 (version code 162)
 
 ## Getting started
 
@@ -134,15 +134,24 @@ inside the app.
 
 ### Publishing an update
 
-1. Bump `versionCode` (and `versionName`) in `app/build.gradle.kts` and build the APK
-   with the **same keystore** (`app/keystore/jarvis-release.jks`) — a different signer
-   cannot over-install.
-2. Generate the manifest with [`scripts/make_update_json.sh`](scripts/make_update_json.sh)
-   (or the `.ps1` on Windows); it computes the SHA-256, size and version fields.
-3. Upload the APK and `update.json` to the GitHub Release. The update URL is a single
-   source of truth: `UPDATE_MANIFEST_URL` in `app/build.gradle.kts` (default points at
-   the latest GitHub Release's `update.json`).
-4. Set `mandatory` to `true` to force the update, or `false` for optional.
+The release workflow does most of this automatically: when a new version is merged to
+`main`, the single signed APK is built and `update.json` is generated and uploaded next to
+it, so users get the update in-app.
+
+1. Bump `versionCode` (and `versionName`) in `app/build.gradle.kts`. The APK is built once
+   on merge to `main` with the **same keystore** (`app/keystore/jarvis-release.jks`) — a
+   different signer cannot over-install.
+2. The workflow generates `update.json` from the built APK (SHA-256, size, version fields)
+   using [`scripts/make_update_json.sh`](scripts/make_update_json.sh) and publishes it with
+   the APK. The app reads a single source of truth: `UPDATE_MANIFEST_URL` in
+   `app/build.gradle.kts` (default = the latest GitHub Release's `update.json`).
+3. Optional/forced is controlled by repo **variables** (Settings → Variables), no code
+   change needed: `UPDATE_MANDATORY=true` forces the update, and
+   `UPDATE_MIN_SUPPORTED=<versionCode>` locks any install below that code. Both default to
+   optional (`false` / `0`).
+4. To host the manifest differently (no CI), build the APK and run
+   `scripts/make_update_json.sh <apk> <code> <name> <https apkUrl> [minSupported] [mandatory]`
+   yourself, then upload both files.
 
 FCM "instant push" (topic `app-update`) is intentionally not wired up yet because the
 project has no `google-services.json`; the feature works fully without it. See
