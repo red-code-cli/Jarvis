@@ -10,7 +10,7 @@ configured, and which Android 14+ rules constrain the design.
 |---|---|---|
 | Microphone owner | `SherpaWakeEngine` (KWS + tiny VAD) | `AudioRecorder` (Gemini Live) |
 | Gemini Live WebSocket | not connected | connected |
-| Speaker model (`SherpaVoiceprint`) | released after 10 min of uninterrupted standby | loaded on the first wake verification |
+| Speaker model (`SherpaVoiceprint`) | pre-warmed after entering standby, released after 30 min of uninterrupted standby | loaded on the first wake verification |
 | Wi-Fi low-latency lock | released | held |
 | Harness run/UI (`HarnessRunService`, log sheet) | not created | created on demand |
 | Wake models on disk | loaded read-only by KWS | same files, no extra copy |
@@ -19,11 +19,15 @@ configured, and which Android 14+ rules constrain the design.
 The service that owns the mic is `JarvisConversationService` (declared with
 `foregroundServiceType="microphone|mediaPlayback|mediaProjection"`). In standby it runs only the
 detector: sherpa-onnx keyword spotting over 20 ms frames plus an energy VAD over the same frames.
+The detector's microphone and native decode run on a single daemon thread; a keyword hit is
+dispatched to a separate callback thread, so heavy work on the wake path (owner verification,
+persona switch, session hand-off) can never stall audio capture.
 Everything else is released:
 
 * `enterStandby()` → `stopActiveConversation()` closes the live session and its `AudioRecorder`.
-* `releaseStandbyHeavyResources()` drops the low-latency Wi-Fi lock immediately and schedules
-  `OwnerVoiceManager.releaseSpeakerModel()` after `SPEAKER_MODEL_IDLE_RELEASE_MS` (10 min) of
+* `releaseStandbyHeavyResources()` drops the low-latency Wi-Fi lock immediately, pre-warms the
+  speaker model on a background thread when owner verification is enabled, and schedules
+  `OwnerVoiceManager.releaseSpeakerModel()` after `SPEAKER_MODEL_IDLE_RELEASE_MS` (30 min) of
   uninterrupted standby, so the first wake after going idle is instant but a phone that has been
   listening for hours is not holding the speaker model.
 * The 30-minute inactivity timeout (`INACTIVITY_TIMEOUT_MS`) is what unloads the session after
@@ -50,16 +54,22 @@ without restarting the app.
 
 | Setting (`wakeSensitivity`) | `keywordsScore` | `keywordsThreshold` | VAD `minRms` | VAD margin |
 |---|---|---|---|---|
-| `high` – High (Far-field) | 2.0 | 0.16 | 26 | 2.0 |
-| `balanced` – Balanced | 1.5 | 0.25 | 45 | 2.6 |
-| `low` – Low (Strict) | 1.0 | 0.40 | 75 | 3.2 |
+| `high` – High (Far-field) | 1.9 | 0.18 | 30 | 2.2 |
+| `balanced` – Balanced | 1.5 | 0.28 | 52 | 2.8 |
+| `low` – Low (Strict) | 1.1 | 0.45 | 88 | 3.4 |
 
 `keywordsScore` is the keyword boosting score (higher = easier) and `keywordsThreshold` is the
 posterior a hit must clear (lower = easier). The VAD accepts a hit only when the peak energy of the
-last 1.2 s is above both an absolute floor and `noiseFloor * margin`, where `noiseFloor` follows
+last 500 ms is above both an absolute floor and `noiseFloor * margin`, where `noiseFloor` follows
 quiet quickly and climbs slowly, capped at 600 RMS so a loud room cannot push speech below the bar.
 The peak window is used because the spotter reports the hit after its trailing blanks, i.e. possibly
-on a frame that is already silent.
+on a frame that is already silent; it is deliberately short (500 ms) so a loud transient from
+earlier in the room cannot fake the speech energy for a later keyword hit.
+
+**Noise filter.** When **Settings → Noise filter** is on, the standby detector attaches the platform
+`NoiseSuppressor` to its capture session (just like `AudioRecorder` does for the active session), so
+the same "ignore TV/chatter" intent applies while idle too. The 4 s watchdog rebuilds the detector
+when the setting flips.
 
 **Owner verification is separate.** `AppPreferences.ownerVoiceThreshold` (cosine distance for the
 CAM++ speaker embedding) is the only knob for *who* may wake Jarvis and is never derived from
@@ -100,7 +110,10 @@ These are the constraints the code follows today, from the Android developer doc
    access`. **This is the reason the wake detector cannot live in a second, separate mic service**
    (it would have to be created from the background on every wake).
 3. **The mic must be released before the session starts.** Android allows one active `AudioRecord`
-   per app; the wake engine is stopped and joined before `AudioRecorder` starts (220 ms handoff).
+   per app; the wake engine is stopped and joined before `AudioRecorder` starts. The hand-off is
+   event-driven: `onWakeWordDetected()` runs on the engine's callback thread, so `stopWakeEngine()`
+   actually joins the microphone worker and returns only once `AudioRecord` is released — there is
+   no fixed delay before the active mic opens.
 4. **Notification is mandatory** while the FGS runs. On Android 13+ the notification is only
    *visible* if `POST_NOTIFICATIONS` is granted; without it the service still runs and Android shows
    its own "running in background" hint.

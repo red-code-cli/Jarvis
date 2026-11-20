@@ -32,19 +32,19 @@ object WakeSensitivity {
     /** "High (Far-field)": keep the detector loose so a distant or soft wake word still lands. */
     private val HIGH = Profile(
         level = "high",
-        keywordScore = 2.0f,
-        keywordThreshold = 0.16f,
-        minRms = 26f,
-        vadMargin = 2.0f,
+        keywordScore = 1.9f,
+        keywordThreshold = 0.18f,
+        minRms = 30f,
+        vadMargin = 2.2f,
     )
 
     /** "Balanced": the tuned default for a normal room. */
     private val BALANCED = Profile(
         level = "balanced",
         keywordScore = 1.5f,
-        keywordThreshold = 0.25f,
-        minRms = 45f,
-        vadMargin = 2.6f,
+        keywordThreshold = 0.28f,
+        minRms = 52f,
+        vadMargin = 2.8f,
     )
 
     /**
@@ -53,10 +53,10 @@ object WakeSensitivity {
      */
     private val LOW = Profile(
         level = "low",
-        keywordScore = 1.0f,
-        keywordThreshold = 0.40f,
-        minRms = 75f,
-        vadMargin = 3.2f,
+        keywordScore = 1.1f,
+        keywordThreshold = 0.45f,
+        minRms = 88f,
+        vadMargin = 3.4f,
     )
 
     fun profile(level: String?): Profile = when (level) {

@@ -35,6 +35,7 @@ import com.jarvis.assistant.JarvisApp
 import com.jarvis.assistant.audio.SherpaWakeEngine
 import com.jarvis.assistant.audio.VoiceGenderDetector
 import com.jarvis.assistant.audio.WakeModelDownloader
+import com.jarvis.assistant.audio.WakeKeywordNormalizer
 import com.jarvis.assistant.audio.WakeSensitivity
 import com.jarvis.assistant.automation.phone.PhoneCallController
 import com.jarvis.assistant.data.model.GeminiConstants
@@ -109,7 +110,7 @@ class JarvisConversationService : Service() {
         private const val STANDBY_COOLDOWN_MS = 2500L
         // How long a phone left listening keeps the speaker model in memory. The first wake after
         // going idle stays instant; a phone idle for longer frees the model and reloads it on wake.
-        private const val SPEAKER_MODEL_IDLE_RELEASE_MS = 10 * 60 * 1000L
+        private const val SPEAKER_MODEL_IDLE_RELEASE_MS = 30 * 60 * 1000L
 
         // Standby wake engine (sherpa-onnx KWS). Each entry is one keyword phrase: BPE tokens
         // produced with the pinned gigaspeech KWS model's bpe.model (see scripts/text2token.py in
@@ -599,6 +600,9 @@ class JarvisConversationService : Service() {
     private var wakeEngineKeywords: List<String> = emptyList()
     @Volatile
     private var wakeEngineSensitivity: String = ""
+    // Whether the running detector was built with the noise filter, so toggling it restarts it.
+    @Volatile
+    private var wakeEngineNoiseFilter: Boolean = false
     private var wakeWatchdogJob: Job? = null
     private var speakerIdleReleaseJob: Job? = null
     @Volatile
@@ -3897,13 +3901,14 @@ class JarvisConversationService : Service() {
      * Standby runs the wake detector and nothing else from the audio stack.
      *
      * The low-latency Wi-Fi lock only matters while a Gemini Live session streams, so it is
-     * dropped immediately. The speaker model is only needed to verify a wake utterance; it is
-     * released after [SPEAKER_MODEL_IDLE_RELEASE_MS] of uninterrupted standby so the first wake
-     * after going idle is still instant, while a phone left listening all day is not holding a
-     * large model in memory.
+     * dropped immediately. When owner verification is on, the speaker model is pre-warmed on a
+     * background thread so the first wake after entering standby is instant, then released after
+     * [SPEAKER_MODEL_IDLE_RELEASE_MS] of uninterrupted standby so a phone left listening all day
+     * does not hold a large model in memory.
      */
     private fun releaseStandbyHeavyResources() {
         releaseWifiLock()
+        prewarmSpeakerModel()
         speakerIdleReleaseJob?.cancel()
         speakerIdleReleaseJob = serviceScope.launch {
             delay(SPEAKER_MODEL_IDLE_RELEASE_MS)
@@ -3911,6 +3916,17 @@ class JarvisConversationService : Service() {
                 com.jarvis.assistant.audio.OwnerVoiceManager.releaseSpeakerModel()
                 Log.i("JarvisService", "Standby idle: released speaker model (detector-only mode)")
             }
+        }
+    }
+
+    /**
+     * Builds the CAM++ speaker model off the wake path so the first wake does not pay the
+     * model-init cost. No-op unless owner verification is on with an enrolled profile.
+     */
+    private fun prewarmSpeakerModel() {
+        if (!preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()) return
+        serviceScope.launch(Dispatchers.IO) {
+            com.jarvis.assistant.audio.OwnerVoiceManager.warmUp()
         }
     }
 
@@ -3980,6 +3996,7 @@ class JarvisConversationService : Service() {
         wakeEngine = null
         wakeEngineKeywords = emptyList()
         wakeEngineSensitivity = ""
+        wakeEngineNoiseFilter = false
     }
 
     private fun exitStandbyListening() {
@@ -4045,16 +4062,19 @@ class JarvisConversationService : Service() {
             standbyActivatedTime = System.currentTimeMillis()
             val keywords = enabledWakeKeywords(preferences)
             val sensitivity = preferences.wakeSensitivity
+            val noiseFilter = preferences.isNoiseFilterEnabled
             val engine = SherpaWakeEngine(
                 modelDir = WakeModelDownloader.wakeModelDir(applicationContext),
                 keywords = keywords,
                 onKeyword = { keyword -> onWakeKeyword(keyword) },
                 onError = { message -> Log.w("JarvisService", message) },
                 sensitivity = WakeSensitivity.profile(sensitivity),
+                noiseSuppression = noiseFilter,
             )
             wakeEngine = engine
             wakeEngineKeywords = keywords
             wakeEngineSensitivity = sensitivity
+            wakeEngineNoiseFilter = noiseFilter
             engine.start()
             startWakeWatchdog()
             Log.i(
@@ -4107,10 +4127,11 @@ class JarvisConversationService : Service() {
                 // new keywords and thresholds take effect without a reboot.
                 val keywords = enabledWakeKeywords(preferences)
                 val sensitivity = preferences.wakeSensitivity
-                if (keywords != wakeEngineKeywords || sensitivity != wakeEngineSensitivity) {
+                val noiseFilter = preferences.isNoiseFilterEnabled
+                if (keywords != wakeEngineKeywords || sensitivity != wakeEngineSensitivity || noiseFilter != wakeEngineNoiseFilter) {
                     Log.i(
                         "JarvisService",
-                        "Watchdog: wake settings changed (words=${keywords.size}, sensitivity=$sensitivity); restarting detector"
+                        "Watchdog: wake settings changed (words=${keywords.size}, sensitivity=$sensitivity, noiseFilter=$noiseFilter); restarting detector"
                     )
                     stopWakeEngine(cancelWatchdog = false)
                     delay(450L)
@@ -4145,11 +4166,7 @@ class JarvisConversationService : Service() {
 
         // Normalise: the phrase may arrive as "jarvis", "JARVIS" or reconstructed BPE tokens
         // such as "CO DE ▁RE D"; collapse the word-boundary marker and separators to plain spaces.
-        val clean = keyword.lowercase(Locale.ROOT)
-            .replace('▁', ' ')
-            .replace('_', ' ')
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        val clean = WakeKeywordNormalizer.normalize(keyword)
         if (clean.isEmpty()) return
         if (CallStateHelper.isCallOffhook(this)) return
 
@@ -4159,13 +4176,15 @@ class JarvisConversationService : Service() {
         }
 
         // Emergency SOS & Anti-Theft Guard in standby.
-        if (clean.contains("code red") || clean.contains("emergency")) {
+        if (WakeKeywordNormalizer.isEmergency(clean)) {
             executeDetectedCommand(com.jarvis.assistant.automation.command.JarvisCommand.EmergencySos, "kws_standby")
             return
         }
-        if (clean.contains("table guard") || clean.contains("guard on") || clean.contains("guard off")) {
-            val enable = !clean.contains("off")
-            executeDetectedCommand(com.jarvis.assistant.automation.command.JarvisCommand.AntiTheftGuard(enable), "kws_standby")
+        if (WakeKeywordNormalizer.isGuard(clean)) {
+            executeDetectedCommand(
+                com.jarvis.assistant.automation.command.JarvisCommand.AntiTheftGuard(WakeKeywordNormalizer.guardEnabled(clean)),
+                "kws_standby"
+            )
             return
         }
 
@@ -4178,12 +4197,7 @@ class JarvisConversationService : Service() {
         }
         if (now - lastWakeTriggerAt < 1_500L) return
 
-        val detectedKeyword = when {
-            clean.contains("isha") -> "isha"
-            clean.contains("virus") -> "virus"
-            clean.contains("jarvis") -> "jarvis"
-            else -> return
-        }
+        val detectedKeyword = WakeKeywordNormalizer.personaWakeWord(clean) ?: return
 
         // Wake fast-path needs actual voice energy so a faint keyword hit is ignored. The tiny VAD
         // in the engine compares the current frame against the noise floor it learned in this
@@ -4281,6 +4295,10 @@ class JarvisConversationService : Service() {
             Log.i("JarvisService", "Wake verified: owner confirmed (dist=${match.distance}, sim=${match.similarityPercent}%).")
         }
 
+        // Verification is heavy; standby may have been left underneath us. Bail out quietly so a
+        // stale callback cannot start a second session.
+        if (!_isStandby.value) return
+
         // Multi-Persona dynamic auto-switch based on spoken wake keyword
         if (!detectedKeyword.isNullOrBlank()) {
             when (detectedKeyword) {
@@ -4315,13 +4333,12 @@ class JarvisConversationService : Service() {
         hasSignalledUtteranceEnd = false
         serviceScope.launch { _wakeEvents.emit(Unit) }
 
-        // Decouple microphone start: allow the wake engine worker thread to cleanly release AudioRecord before opening the active mic
-        serviceScope.launch(Dispatchers.Default) {
-            delay(220L)
-            withContext(Dispatchers.Main) {
-                if (!_isSessionOn.value && !_isStandby.value) {
-                    beginActiveConversation(wakeTriggered = true)
-                }
+        // Event-driven hand-off: this runs on the engine's callback thread, so exitStandbyListening()
+        // -> engine.stop() joins the microphone worker and returns only once AudioRecord is released.
+        // The active mic can therefore open immediately — no fixed delay needed.
+        serviceScope.launch(Dispatchers.Main) {
+            if (!_isSessionOn.value && !_isStandby.value) {
+                beginActiveConversation(wakeTriggered = true)
             }
         }
     }

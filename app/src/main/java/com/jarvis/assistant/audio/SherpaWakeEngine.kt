@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.KeywordSpotter
@@ -12,6 +13,8 @@ import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineStream
 import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.math.min
 import kotlin.math.sqrt
 
@@ -26,6 +29,14 @@ import kotlin.math.sqrt
  *    involving the (much heavier) speaker model;
  *  - retries the microphone forever instead of stopping after one error.
  *
+ * Thread model
+ * ------------
+ * Exactly one daemon thread (`SherpaWake`) touches the microphone and the sherpa-onnx
+ * stream. A keyword hit is *not* handled on that thread: it is dispatched to a separate
+ * single callback thread so the heavy service work (speaker verification, persona switch,
+ * session hand-off) can never stall audio capture. This keeps the mic read loop tight and
+ * makes [stop] deterministic, because the callback never runs on the worker thread.
+ *
  * It is the only component that touches the microphone while Jarvis is idle, which keeps the
  * standby footprint small: KWS + VAD, no session, no speaker model.
  *
@@ -37,17 +48,21 @@ class SherpaWakeEngine(
     private val onKeyword: (String) -> Unit,
     private val onError: (String) -> Unit = {},
     private val sensitivity: WakeSensitivity.Profile = WakeSensitivity.profile("balanced"),
+    /** Attach the platform [NoiseSuppressor] to the wake capture session (Settings → Noise filter). */
+    private val noiseSuppression: Boolean = false,
 ) {
     companion object {
         private const val TAG = "SherpaWakeEngine"
         private const val SAMPLE_RATE = 16000
         private const val CHUNK_SAMPLES = 320 // 20 ms at 16 kHz
         private const val HISTORY_BYTES = 16_000 * 2 * 2 // ~2 s
-        // Above this the room is loud enough that the absolute floor is already doing the work;
-        // without the cap a noisy room would scale the bar up faster than speech can follow.
-        private const val NOISE_FLOOR_CAP = 600f
-        // The wake utterance's energy is judged over this window, not on a single frame.
-        private const val PEAK_WINDOW_MS = 1_200L
+        // The wake utterance's energy is judged over this window, not on a single frame. The
+        // spotter reports the hit a little after the keyword (trailing blanks), so the window
+        // must cover that delay — but keeping it short stops a loud transient from more than
+        // half a second before the keyword from faking speech energy.
+        private const val PEAK_WINDOW_MS = 500L
+        // Bound for a single native read/join so teardown can never hang.
+        private const val STOP_JOIN_MS = 1_500L
     }
 
     /**
@@ -78,30 +93,56 @@ class SherpaWakeEngine(
     @Volatile
     private var activeRecord: AudioRecord? = null
 
+    private var activeNoiseSuppressor: NoiseSuppressor? = null
+
     private var worker: Thread? = null
+
+    /** Serialises [start]/[stop] so a restart can never leave two workers behind. */
+    private val lifecycleLock = Any()
+
+    /**
+     * Handles keyword hits off the audio thread. `onKeyword` may do heavy work (speaker
+     * verification) and may call back into [stop]; running it on a separate thread keeps the
+     * microphone read loop unblocked either way. Recreated per [start] so a restart is safe.
+     */
+    private var callbackExecutor: ExecutorService? = null
 
     private val pcmHistory = java.util.ArrayDeque<ByteArray>()
     private var pcmHistoryBytes = 0
 
     fun start(): Boolean {
-        if (running) return true
-        running = true
-        worker = Thread({ runLoop() }, "SherpaWake").apply {
-            isDaemon = true
-            start()
+        synchronized(lifecycleLock) {
+            if (running) return true
+            running = true
+            callbackExecutor = Executors.newSingleThreadExecutor { runnable ->
+                Thread(runnable, "SherpaWakeCallback").apply { isDaemon = true }
+            }
+            worker = Thread({ runLoop() }, "SherpaWake").apply {
+                isDaemon = true
+                start()
+            }
+            return true
         }
-        return true
     }
 
     fun stop() {
-        running = false
+        val thread: Thread?
+        val executor: ExecutorService?
+        synchronized(lifecycleLock) {
+            running = false
+            thread = worker
+            worker = null
+            executor = callbackExecutor
+            callbackExecutor = null
+        }
+        // Unblock the in-flight native read on the worker thread before joining it.
         runCatching { activeRecord?.stop() }
-        val thread = worker
-        worker = null
         if (thread != null && thread !== Thread.currentThread()) {
-            runCatching { thread.join(1200L) }
+            runCatching { thread.join(STOP_JOIN_MS) }
         }
         activeRecord = null
+        releaseNoiseSuppressor()
+        executor?.shutdown()
     }
 
     /** Last ~2 s of microphone PCM (mono PCM16 @16 kHz), for owner verification. */
@@ -112,15 +153,10 @@ class SherpaWakeEngine(
     }
 
     /**
-     * Tiny VAD verdict for the wake utterance: did the last ~1 s carry speech-level energy, given
-     * the sensitivity the user picked and the noise floor learned in this room? A peak window is
-     * used because the KWS result lands after the trailing blanks, i.e. possibly on a silent frame.
+     * Tiny VAD verdict for the wake utterance: did the recent peak carry speech-level energy,
+     * given the sensitivity the user picked and the noise floor learned in this room?
      */
-    fun isVoiced(): Boolean {
-        val floor = noiseFloor.coerceAtMost(NOISE_FLOOR_CAP)
-        val threshold = maxOf(sensitivity.minRms, floor * sensitivity.vadMargin)
-        return recentPeakRms() >= threshold
-    }
+    fun isVoiced(): Boolean = WakeVad.isVoiced(recentPeakRms(), noiseFloor, sensitivity)
 
     /** Highest frame energy in the last [PEAK_WINDOW_MS]. */
     fun recentPeakRms(): Float {
@@ -136,14 +172,15 @@ class SherpaWakeEngine(
         }
     }
 
-    private fun updateNoiseFloor(rms: Float) {
-        if (rms <= 0f) return
-        val floor = noiseFloor
-        noiseFloor = when {
-            floor <= 0f -> rms
-            rms < floor -> floor * 0.7f + rms * 0.3f          // follow quiet quickly
-            else -> floor * 0.999f + rms * 0.001f              // climb slowly
-        }
+    private fun dispatchKeyword(keyword: String) {
+        if (!running) return
+        val executor = callbackExecutor ?: return
+        runCatching {
+            executor.execute {
+                runCatching { onKeyword(keyword) }
+                    .onFailure { Log.w(TAG, "onKeyword failed: ${it.message}") }
+            }
+        }.onFailure { Log.w(TAG, "Keyword dispatch skipped: ${it.message}") }
     }
 
     private fun runLoop() {
@@ -185,7 +222,7 @@ class SherpaWakeEngine(
                     }
                     lastRms = sqrt(sum / read).toFloat()
                     updatePeakRms(lastRms)
-                    updateNoiseFloor(lastRms)
+                    noiseFloor = WakeVad.nextNoiseFloor(noiseFloor, lastRms)
                     appendHistory(shortBuffer, read)
 
                     stream.acceptWaveform(floatBuffer.copyOf(read), SAMPLE_RATE)
@@ -195,7 +232,7 @@ class SherpaWakeEngine(
                         val keyword = result.keyword
                         if (keyword.isNotBlank()) {
                             spotter.reset(stream)
-                            onKeyword(keyword)
+                            dispatchKeyword(keyword)
                         }
                     }
                 }
@@ -204,7 +241,7 @@ class SherpaWakeEngine(
                     failures++
                     Log.w(TAG, "Wake mic restart #$failures: ${t.message}")
                     onError("Wake microphone retry: ${t.message}")
-                    runCatching { Thread.sleep(min(3000L, 350L * failures)) }
+                    sleepWhileRunning(min(3000L, 350L * failures))
                 }
             } finally {
                 runCatching { stream?.release() }
@@ -212,7 +249,23 @@ class SherpaWakeEngine(
                 runCatching { record?.stop() }
                 runCatching { record?.release() }
                 activeRecord = null
+                releaseNoiseSuppressor()
             }
+        }
+    }
+
+    /** Cancellable sleep so [stop] returns promptly instead of waiting out a backoff. */
+    private fun sleepWhileRunning(millis: Long) {
+        var remaining = millis
+        while (running && remaining > 0) {
+            val step = min(remaining, 100L)
+            try {
+                Thread.sleep(step)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return
+            }
+            remaining -= step
         }
     }
 
@@ -285,12 +338,38 @@ class SherpaWakeEngine(
                     )
                     .setBufferSizeInBytes(bufferSize)
                     .build()
-                if (record.state == AudioRecord.STATE_INITIALIZED) return record
+                if (record.state == AudioRecord.STATE_INITIALIZED) {
+                    applyNoiseSuppression(record)
+                    return record
+                }
             } catch (t: Throwable) {
                 Log.w(TAG, "Audio source $source unavailable: ${t.message}")
             }
             runCatching { record?.release() }
         }
         return null
+    }
+
+    /** Attaches the platform noise suppressor when the user enabled the noise filter. */
+    private fun applyNoiseSuppression(record: AudioRecord) {
+        if (!noiseSuppression) return
+        if (!NoiseSuppressor.isAvailable()) return
+        try {
+            activeNoiseSuppressor = NoiseSuppressor.create(record.audioSessionId)?.apply {
+                enabled = true
+            }
+            Log.i(TAG, "Wake NoiseSuppressor enabled on session ${record.audioSessionId}")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to enable wake NoiseSuppressor: ${t.message}")
+        }
+    }
+
+    private fun releaseNoiseSuppressor() {
+        try {
+            activeNoiseSuppressor?.release()
+        } catch (_: Throwable) {
+        } finally {
+            activeNoiseSuppressor = null
+        }
     }
 }
