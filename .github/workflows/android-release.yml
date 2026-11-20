@@ -49,28 +49,26 @@ jobs:
           # A PR may read the cache main wrote, but must not poison it for the release job.
           cache-read-only: true
 
-      # One Gradle invocation so configuration and dependency resolution are shared.
-      # Compiling androidTest checks the Room migration test still builds; no APK here.
-      - name: Unit tests + compile both modules + androidTest compile
+      # One Gradle invocation shares configuration, dependency resolution, up-to-date checks and
+      # the build cache, so already-completed work is never redone and the daemon starts once.
+      # Compiling androidTest checks the Room migration test still builds; R8 uses the release
+      # keep rules so a missing ProGuard rule fails BEFORE merge. No APK is produced here.
+      - name: Unit tests, compile, lint and R8 shrink check (no APK)
         run: |
+          set +e
           sh ./gradlew --no-daemon \
             :app:compileDebugKotlin \
             :app:compileDebugAndroidTestKotlin \
-            testDebugUnitTest
-
-      - name: Lint
-        run: |
-          sh ./gradlew --no-daemon :app:lintDebug
+            testDebugUnitTest \
+            :app:lintDebug \
+            :app:minifyReleaseWithR8
+          status=$?
           report="app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt"
           if [ -f "$report" ]; then
             echo "==== LINT ERRORS ===="
             grep -nE ": Error:" "$report" | head -60 || true
           fi
-
-      # R8 with the release keep rules, so a missing ProGuard rule fails BEFORE merge.
-      # This does not package an APK (the single release APK is built only on main).
-      - name: Release shrink check (R8, no APK)
-        run: sh ./gradlew --no-daemon :app:minifyReleaseWithR8
+          exit $status
 
   release:
     name: Build the single signed APK and publish the release
@@ -145,6 +143,26 @@ jobs:
           path: out/*
           if-no-files-found: error
 
+      # Publishes the HTTPS update manifest next to the APK so the in-app updater can find it
+      # at releases/latest/download/update.json. Optional repo variables let a release be made
+      # mandatory / set a minimum supported version without touching code:
+      #   vars.UPDATE_MANDATORY=true            -> force-lock older installs
+      #   vars.UPDATE_MIN_SUPPORTED=<versionCode> -> lock installs below this code
+      # Both default to optional (false / 0) so a normal release never blocks anyone.
+      - name: Generate update.json (in-app update manifest)
+        env:
+          UPDATE_MANDATORY: ${{ vars.UPDATE_MANDATORY }}
+          UPDATE_MIN_SUPPORTED: ${{ vars.UPDATE_MIN_SUPPORTED }}
+        run: |
+          name="${{ steps.version.outputs.name }}"
+          code="${{ steps.version.outputs.code }}"
+          mandatory="${UPDATE_MANDATORY:-false}"
+          min_supported="${UPDATE_MIN_SUPPORTED:-0}"
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${name}/jarvis-v${name}.apk"
+          sh scripts/make_update_json.sh "out/jarvis-v${name}.apk" "$code" "$name" "$url" "$min_supported" "$mandatory" "" "out/update.json"
+          echo "---- update.json ----"
+          cat out/update.json
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -156,18 +174,15 @@ jobs:
           body: |
             ## Jarvis v${{ steps.version.outputs.name }} (versionCode ${{ steps.version.outputs.code }})
 
-            Follow-up to v1.15.0 that completes the two items it did not cover.
+            ### In-app auto update (force update)
+            - App ke andar hi check, download, verify aur install — GitHub Release ke `update.json` se (HTTPS only).
+            - Optional update par "Later" milta hai; mandatory par full-screen block (wake/orb/chat/automation band).
+            - Emergency SOS ("Code Red"), call pick/cut aur guard phrases force-update me bhi kaam karte rahenge.
+            - Install se pehle SHA-256 + package + signer verify; mismatch par file delete.
+            - Root/Shizuku silent install (agar available) warna standard installer.
 
-            ### B1 - truthful verification and counters
-            - Verification prefers the project root recorded in project memory and searches subfolders (depth 3) for the web entry file, so an `index.html` inside a project subfolder is found.
-            - Failure reasons now print `checked <path> (N files, depth <= 3)`.
-            - Files counter comes from a workspace walk (ground truth); it never stays at 0 while files exist, and event counts can no longer pull it down.
-            - Agent Live feed dedupes text (no more `Wrote index.htmlindex.html`) and truncates on word boundaries in both the live path and the restore path.
-            - A built-in static preview server is the finalize fallback, so a finished static site always opens in Jarvis Browser.
+            ### Wake word — faster, more stable, better accuracy
+            - Wake hit ab audio thread par nahi, alag callback thread par (mic read loop block nahi hota).
+            - Fixed 220ms handoff hataya (event-driven); VAD peak window 1.2s -> 0.5s; standby par noise filter; sensitivity re-tune.
 
-            ### B6 - update without uninstall
-            - Stable committed signing identity (`app/keystore/jarvis-release.jks`); release builds are now signed with the same certificate every time.
-            - The release job builds `assembleRelease` (signed, R8) once and verifies the certificate and versionCode before publishing.
-            - Room schema test added alongside the exported schema.
-
-            > Signing note: builds before this one used ephemeral debug keys, so installing this build over one of those needs ONE uninstall. Every update after this one will over-install.
+            > Note: jo build pehle se installed hai usme ye update feature nahi hai, isliye **ye build (v${{ steps.version.outputs.name }}) ek baar manually install karna padega**. Uske baad har naya release in-app update ho jayega.

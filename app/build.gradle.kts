@@ -40,14 +40,20 @@ android {
         applicationId = "com.jarvis.assistant"
         minSdk = 26
         targetSdk = 34
-        versionCode = 161
-        versionName = "1.15.1"
+        versionCode = 162
+        versionName = "1.16.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEVELOPER_NAME", buildConfigString(developerName.ifBlank { "Unverified developer" }))
         buildConfigField("String", "COPYRIGHT_OWNER", buildConfigString(copyrightOwner.ifBlank { "Unconfigured" }))
         buildConfigField("String", "PINNED_RELEASE_CERT_SHA256", buildConfigString(releaseCertSha256))
         buildConfigField("String", "VERIFICATION_ENDPOINT", buildConfigString(verificationEndpoint))
+        // Single source of truth for the in-app updater manifest URL (HTTPS only).
+        buildConfigField(
+            "String",
+            "UPDATE_MANIFEST_URL",
+            buildConfigString("https://github.com/red-code-cli/Jarvis/releases/latest/download/update.json")
+        )
     }
 
     signingConfigs {
@@ -195,6 +201,9 @@ dependencies {
 
     // Security Crypto for EncryptedSharedPreferences
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // WorkManager: battery-friendly periodic (6h, network-connected) update check.
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250107")

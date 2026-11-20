@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     val viewModel: MainViewModel by viewModels()
     private var activeSnackbar: Snackbar? = null
+    private var forceUpdateObserver: kotlinx.coroutines.Job? = null
 
     private var currentPage = TAB_HOME
     private var lastDockPage = TAB_HOME
@@ -237,6 +238,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigationDock()
         selectPage(currentPage, animate = false)
         observeViewModel()
+        startForceUpdateObserver()
 
         // Jarvis's open_settings tool can ask for a specific category.
         intent?.getStringExtra(EXTRA_SETTINGS_CATEGORY)?.let { category ->
@@ -278,7 +280,10 @@ class MainActivity : AppCompatActivity() {
             appliedThemeKey = prefs.appTheme
             appliedCustomHex = prefs.customThemeColor
             recreate()
+            return
         }
+        if (enforceForceUpdateIfNeeded()) return
+        maybeCheckForUpdates()
     }
 
     private fun fragments(): List<Pair<Int, androidx.fragment.app.Fragment>> = listOf(
@@ -849,6 +854,7 @@ class MainActivity : AppCompatActivity() {
      * so a message is never silently dropped.
      */
     fun sendTextToJarvis(text: String) {
+        if (blockIfUpdateRequired()) return
         val clean = text.trim()
         if (clean.isEmpty()) return
 
@@ -896,7 +902,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Mandatory-update gate laid on top of the existing start path. Returns true when the user
+     * must update first, in which case the blocking update screen is shown and Jarvis must not
+     * start. Fail-open: only true when a valid mandatory server response set the force flag.
+     */
+    private fun blockIfUpdateRequired(): Boolean {
+        if (!com.jarvis.assistant.update.UpdateManager.isForceUpdateActive()) return false
+        runCatching {
+            startActivity(Intent(this, com.jarvis.assistant.update.UpdateActivity::class.java))
+        }
+        return true
+    }
+
+    private fun enforceForceUpdateIfNeeded(): Boolean = blockIfUpdateRequired()
+
+    private fun startForceUpdateObserver() {
+        if (forceUpdateObserver?.isActive == true) return
+        forceUpdateObserver = lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                com.jarvis.assistant.update.UpdateManager.forceActiveFlow.collect { active ->
+                    if (active) blockIfUpdateRequired()
+                }
+            }
+        }
+    }
+
+    private fun maybeCheckForUpdates() {
+        if (!com.jarvis.assistant.update.UpdateCoordinator.shouldCheckOnResume()) return
+        lifecycleScope.launch {
+            runCatching { com.jarvis.assistant.update.UpdateCoordinator.checkNow(this@MainActivity) }
+        }
+    }
+
     private fun checkPermissionsAndStart() {
+        if (blockIfUpdateRequired()) return
         if (!PermissionHelper.hasRecordAudioPermission(this)) {
             requestAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             return

@@ -1139,6 +1139,12 @@ class JarvisConversationService : Service() {
 
     private fun beginActiveConversation(wakeTriggered: Boolean = false) {
         if (_isSessionOn.value) return
+        // Mandatory-update gate: never start a new assistant session while the user must update.
+        // Standby wake listening is left untouched so Emergency SOS ("Code Red") keeps working.
+        if (com.jarvis.assistant.update.UpdateManager.isForceUpdateActive()) {
+            Log.i("JarvisService", "Force update active — refusing to start a new session.")
+            return
+        }
         com.jarvis.assistant.automation.agent.AgentTaskEngine.resetForSession()
         isAutonomousContinuationTurn = false
         synchronized(autonomousAudioLock) {
@@ -4259,6 +4265,12 @@ class JarvisConversationService : Service() {
 
     private fun onWakeWordDetected(detectedKeyword: String? = null) {
         if (!_isStandby.value) return
+        // Mandatory-update gate: ignore wake activation until the app is updated. Emergency SOS,
+        // call pick/cut and guard phrases are handled earlier in onWakeKeyword, so they still work.
+        if (com.jarvis.assistant.update.UpdateManager.isForceUpdateActive()) {
+            Log.i("JarvisService", "Force update active — wake activation ignored (SOS still armed).")
+            return
+        }
         val now = System.currentTimeMillis()
         if (now - lastWakeTriggerAt < 1_200L) return
         lastWakeTriggerAt = now

@@ -102,7 +102,34 @@ class AppPreferences(context: Context) {
         private const val KEY_ORB_SCALE = "key_orb_scale"
         private const val KEY_ORB_HUE = "key_orb_hue"
         private const val KEY_CUSTOM_ENDPOINT = "key_custom_endpoint"
+        // In-app updater (new keys only; existing keys/defaults are never changed).
+        private const val KEY_UPDATE_FORCE_ACTIVE = "key_update_force_active"
+        private const val KEY_UPDATE_LAST_CHECK = "key_update_last_check"
+        private const val KEY_UPDATE_CACHED_MANIFEST = "key_update_cached_manifest"
+        private const val KEY_UPDATE_SKIP_VERSION = "key_update_skip_version"
+        private const val KEY_UPDATE_LAST_ERROR = "key_update_last_error"
     }
+
+    // ── In-app updater ────────────────────────────────────────────────────────
+    var updateForceActive: Boolean
+        get() = prefs.getBoolean(KEY_UPDATE_FORCE_ACTIVE, false)
+        set(value) = prefs.edit().putBoolean(KEY_UPDATE_FORCE_ACTIVE, value).apply()
+
+    var updateLastCheckAt: Long
+        get() = prefs.getLong(KEY_UPDATE_LAST_CHECK, 0L)
+        set(value) = prefs.edit().putLong(KEY_UPDATE_LAST_CHECK, value).apply()
+
+    var updateCachedManifestJson: String
+        get() = prefs.getString(KEY_UPDATE_CACHED_MANIFEST, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_UPDATE_CACHED_MANIFEST, value).apply()
+
+    var updateSkipVersionCode: Int
+        get() = prefs.getInt(KEY_UPDATE_SKIP_VERSION, 0)
+        set(value) = prefs.edit().putInt(KEY_UPDATE_SKIP_VERSION, value).apply()
+
+    var updateLastError: String
+        get() = prefs.getString(KEY_UPDATE_LAST_ERROR, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_UPDATE_LAST_ERROR, value).apply()
 
     var isOwnerVoiceEnabled: Boolean
         get() = prefs.getBoolean(KEY_OWNER_VOICE_ENABLED, false)
