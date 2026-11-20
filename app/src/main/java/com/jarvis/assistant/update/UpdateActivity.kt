@@ -79,7 +79,8 @@ class UpdateActivity : AppCompatActivity() {
         super.onResume()
         if (awaitingPermission && UpdateInstaller.canInstall(this)) {
             awaitingPermission = false
-            startInstallFlow()
+            // Permission ab mil gayi — download/install flow wahin se continue karo.
+            onPrimaryClicked()
         }
     }
 
@@ -113,7 +114,7 @@ class UpdateActivity : AppCompatActivity() {
                 return
             }
             setStatus("Verify ho raha hai...")
-            when (val result = withContext(Dispatchers.IO) { ApkVerifier.verify(this, apk, current) }) {
+            when (val result = withContext(Dispatchers.IO) { ApkVerifier.verify(this@UpdateActivity, apk, current) }) {
                 is ApkVerifier.Result.Ok -> installVerifiedApk(apk)
                 is ApkVerifier.Result.Failure -> {
                     apk.delete()
