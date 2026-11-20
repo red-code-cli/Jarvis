@@ -10,6 +10,12 @@ An Android voice assistant built with Kotlin, Gemini Live, on-device voice compo
 - Compile and target SDK: 34
 - Java/Kotlin target: 17
 - Current app version: 1.16.0 (version code 162)
+- Latest release: [Jarvis v1.16.0](https://github.com/red-code-cli/Jarvis/releases/tag/v1.16.0)
+- Download: [`jarvis-v1.16.0.apk`](https://github.com/red-code-cli/Jarvis/releases/download/v1.16.0/jarvis-v1.16.0.apk) ([SHA-256](https://github.com/red-code-cli/Jarvis/releases/download/v1.16.0/checksums.txt))
+
+> **v1.16.0 ek baar manually install karna padega.** Isse pehle ke builds me in-app
+> updater nahi hai. Ye build install karne ke baad har naya release app ke andar hi
+> download aur install ho jayega.
 
 ## Getting started
 
@@ -36,22 +42,33 @@ The Gradle wrapper is included in this project. Use `gradlew.bat` on Windows or 
 ./gradlew :app:assembleRelease
 ```
 
-Build outputs are written under `app/build/outputs/` and are generated files, not source files. Release builds enable R8 and resource shrinking. `assembleRelease` intentionally refuses to package unless a dedicated keystore, its SHA-256 certificate pin, and publisher metadata are configured. Never commit keystores or passwords.
+Build outputs are written under `app/build/outputs/` and are generated files, not source files. Release builds enable R8 and resource shrinking.
 
-Create and protect a release key outside this repository, then supply these values only in the local shell or Gradle user properties:
+### Signing (stable identity — do not replace)
 
-```powershell
-$env:JARVIS_RELEASE_STORE_FILE = 'C:\secure\jarvis-release.jks'
-$env:JARVIS_RELEASE_STORE_PASSWORD = '<local secret>'
-$env:JARVIS_RELEASE_KEY_ALIAS = 'jarvis-release'
-$env:JARVIS_RELEASE_KEY_PASSWORD = '<local secret>'
-$env:JARVIS_RELEASE_CERT_SHA256 = '<64 hex characters from keytool -list -v>'
-$env:JARVIS_DEVELOPER_NAME = 'TechGpt X'
-$env:JARVIS_COPYRIGHT_OWNER = 'TechGpt X'
-.\gradlew.bat :app:assembleRelease
-```
+Every release is signed with the single stable keystore committed at
+`app/keystore/jarvis-release.jks`. The same certificate must be used for every future
+build: a different signer cannot over-install an existing app, and the in-app updater
+rejects an APK whose signature does not match the installed one.
 
-The certificate fingerprint must be calculated from the same key used to sign the APK. This project currently has no deployed verification backend or agreed verification API protocol. Local signer pinning and APK signatures do not provide server-side authentication, Play Integrity attestation, or rate limiting; the app identity screen reports remote verification as unavailable until that service is implemented and deployed.
+The release APK is built once by `.github/workflows/android-release.yml` when a version is
+merged to `main` (or when the workflow is run manually). The workflow reads the optional
+`JARVIS_RELEASE_*` values first and falls back to the bundled keystore:
+
+- `JARVIS_RELEASE_STORE_BASE64` — base64 of the keystore file
+- `JARVIS_RELEASE_STORE_PASSWORD`
+- `JARVIS_RELEASE_KEY_ALIAS`
+- `JARVIS_RELEASE_KEY_PASSWORD`
+- `JARVIS_RELEASE_CERT_SHA256` — 64-hex certificate pin
+
+Real deployment values belong in **GitHub Secrets**, never in the repository or a commit.
+Do not create a second keystore and do not print or commit passwords.
+
+The project currently has no deployed verification backend or agreed verification API
+protocol. Local signer pinning and APK signatures do not provide server-side
+authentication, Play Integrity attestation, or rate limiting; the app identity screen
+reports remote verification as unavailable until that service is implemented and
+deployed.
 
 ## Repository layout
 
@@ -174,4 +191,4 @@ FCM setup steps.
 - Keep API keys, SDK paths, signing keys, and local machine settings out of source control.
 - `local.properties` is local-only; start from `local.properties.example` when setting up a new machine.
 - Screen sharing and accessibility automation require explicit Android user consent and permissions.
-- Bundled Vosk model assets are runtime dependencies; do not remove or rename their directories without updating the model-loading code.
+- Bundled offline wake-word models (`app/src/main/assets/wake-models`) are runtime dependencies; do not remove or rename their directories without updating the model-loading code.
