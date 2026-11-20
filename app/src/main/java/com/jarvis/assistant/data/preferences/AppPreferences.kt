@@ -83,6 +83,7 @@ class AppPreferences(context: Context) {
         private const val KEY_EMERGENCY_CONTACT_PHONE = "key_emergency_contact_phone"
         private const val KEY_ANTI_THEFT_ALARM_ENABLED = "key_anti_theft_alarm_enabled"
         private const val KEY_SHAKE_TO_TALK_ENABLED = "key_shake_to_talk_enabled"
+        private const val KEY_ADVANCED_VOICE_PHONE_EXPANDED = "key_advanced_voice_phone_expanded"
         private const val KEY_CHAT_HISTORY = "key_chat_history"
         private const val KEY_FAVORITE_SONG = "key_favorite_song"
         private const val KEY_FAVORITE_APP = "key_favorite_app"
@@ -579,6 +580,11 @@ class AppPreferences(context: Context) {
     var isShakeToTalkEnabled: Boolean
         get() = prefs.getBoolean(KEY_SHAKE_TO_TALK_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_SHAKE_TO_TALK_ENABLED, value).apply()
+
+    /** Whether the "Advanced voice & phone controls" settings card is expanded. */
+    var isAdvancedVoicePhoneControlsExpanded: Boolean
+        get() = prefs.getBoolean(KEY_ADVANCED_VOICE_PHONE_EXPANDED, false)
+        set(value) = prefs.edit().putBoolean(KEY_ADVANCED_VOICE_PHONE_EXPANDED, value).apply()
 
     var isSilentExecutionMode: Boolean
         get() = prefs.getBoolean(KEY_SILENT_EXECUTION_MODE, false)

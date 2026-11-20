@@ -55,6 +55,8 @@ class SettingsFragment : Fragment() {
         setupClickListeners()
         setupCategoryJump()
         setupVoiceThreshold()
+        updateVoicePhoneAdvancedState(animate = false)
+        setupVoicePhoneAdvancedToggle()
         harnessSettings = HarnessSettingsController(this, binding).also { it.bind() }
     }
 
@@ -63,6 +65,36 @@ class SettingsFragment : Fragment() {
         if (_binding != null) {
             com.jarvis.assistant.util.ThemeManager.applyDynamicBackground(binding.root)
             loadUserData()
+            applyPendingPermissionToggles()
+        }
+    }
+
+    private var pendingEnableCallControl = false
+    private var pendingEnableUnreadMessages = false
+
+    /** Flips advanced toggles on once the permission they needed is granted. */
+    private fun applyPendingPermissionToggles() {
+        val ctx = requireContext()
+        if (pendingEnableCallControl &&
+            com.jarvis.assistant.util.PermissionHelper.hasAnswerPhoneCallsPermission(ctx) &&
+            com.jarvis.assistant.util.PermissionHelper.hasNotificationListenerAccess(ctx)
+        ) {
+            pendingEnableCallControl = false
+            suppressTriggerUpdates = true
+            preferences.isVoiceCallAnsweringEnabled = true
+            binding.switchVoiceCallAnswering.isChecked = true
+            suppressTriggerUpdates = false
+            Toast.makeText(ctx, "Call control ON • 'Pick karo' / 'Cut karo' chalega", Toast.LENGTH_SHORT).show()
+        }
+        if (pendingEnableUnreadMessages &&
+            com.jarvis.assistant.util.PermissionHelper.hasNotificationListenerAccess(ctx)
+        ) {
+            pendingEnableUnreadMessages = false
+            suppressTriggerUpdates = true
+            preferences.isUnreadMessagesReaderEnabled = true
+            binding.switchUnreadMessages.isChecked = true
+            suppressTriggerUpdates = false
+            Toast.makeText(ctx, "Unread reader ON • naye message padh ke sunayega", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -148,17 +180,13 @@ class SettingsFragment : Fragment() {
         // Smart Battery Saver
         binding.switchBatterySaver.isChecked = preferences.isSmartBatterySaverEnabled
 
-        // Background Noise Filter
+        // Background Noise Filter (guarded so permission dialogs never fire from state restore)
+        suppressTriggerUpdates = true
         binding.switchNoiseFilter.isChecked = preferences.isNoiseFilterEnabled
-
-        // Voice Call Control (Pick/Cut)
         binding.switchVoiceCallAnswering.isChecked = preferences.isVoiceCallAnsweringEnabled
-
-        // Unread Messages Reader
         binding.switchUnreadMessages.isChecked = preferences.isUnreadMessagesReaderEnabled
-
-        // Shake to Talk
         binding.switchShakeToTalk.isChecked = preferences.isShakeToTalkEnabled
+        suppressTriggerUpdates = false
 
         // Anti Theft Alarm
         binding.switchAntiTheftAlarm.isChecked = preferences.isAntiTheftAlarmEnabled
@@ -199,6 +227,86 @@ class SettingsFragment : Fragment() {
         targets.forEach { (chip, target) ->
             chip.setOnClickListener { scrollToSettings(target) }
         }
+    }
+
+    /** Applies the saved expanded/collapsed state of the advanced voice & phone card. */
+    private fun updateVoicePhoneAdvancedState(animate: Boolean) {
+        val expanded = preferences.isAdvancedVoicePhoneControlsExpanded
+        val content = binding.voicePhoneAdvancedContent
+        val chevron = binding.imgVoicePhoneAdvancedChevron
+        if (animate) {
+            content.animate().alpha(if (expanded) 1f else 0f).withLayer().setDuration(180L).start()
+            content.postDelayed({
+                content.visibility = if (expanded) View.VISIBLE else View.GONE
+            }, if (expanded) 0L else 180L)
+            chevron.animate().rotation(if (expanded) 90f else 0f).setDuration(180L).start()
+        } else {
+            content.alpha = 1f
+            content.visibility = if (expanded) View.VISIBLE else View.GONE
+            chevron.rotation = if (expanded) 90f else 0f
+        }
+    }
+
+    /** Toggles the advanced voice & phone controls card on header tap. */
+    private fun setupVoicePhoneAdvancedToggle() {
+        binding.voicePhoneAdvancedHeader.setOnClickListener {
+            val next = !preferences.isAdvancedVoicePhoneControlsExpanded
+            preferences.isAdvancedVoicePhoneControlsExpanded = next
+            updateVoicePhoneAdvancedState(animate = true)
+        }
+    }
+
+    private var suppressTriggerUpdates = false
+
+    /**
+     * Blocks a toggle from flipping on until the needed permission is granted. Shows a
+     * Hinglish warning and opens the permission flow. Returns true when the change is allowed.
+     */
+    private fun requireCallControlPermission(enabling: Boolean): Boolean {
+        if (!enabling) return true
+        val hasAnswer = com.jarvis.assistant.util.PermissionHelper.hasAnswerPhoneCallsPermission(requireContext())
+        val hasNotif = com.jarvis.assistant.util.PermissionHelper.hasNotificationListenerAccess(requireContext())
+        if (hasAnswer && hasNotif) return true
+        suppressTriggerUpdates = true
+        binding.switchVoiceCallAnswering.isChecked = false
+        suppressTriggerUpdates = false
+        pendingEnableCallControl = true
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Permission chahiye")
+            .setMessage(
+                "Call control (Pick/Cut) ke liye do permissions zaroori hain:\n\n" +
+                    "• 'Call kholna/band karna' — call handle karne ke liye\n" +
+                    "• Notification access — call ka pata chalne ke liye\n\n" +
+                    "Permission section me jaakar dono ON karo."
+            )
+            .setPositiveButton("Permission do") { _, _ ->
+                startActivity(Intent(requireContext(), PermissionActivity::class.java))
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+        return false
+    }
+
+    /** Blocks Unread Messages Reader until notification access is granted. */
+    private fun requireNotificationAccess(enabling: Boolean): Boolean {
+        if (!enabling) return true
+        if (com.jarvis.assistant.util.PermissionHelper.hasNotificationListenerAccess(requireContext())) return true
+        suppressTriggerUpdates = true
+        binding.switchUnreadMessages.isChecked = false
+        suppressTriggerUpdates = false
+        pendingEnableUnreadMessages = true
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Notification access chahiye")
+            .setMessage(
+                "Unread messages reader naye messages dekhne ke liye Notification access use karta hai.\n\n" +
+                    "Permission section me jaakar 'Notification access' ON karo."
+            )
+            .setPositiveButton("Permission do") { _, _ ->
+                startActivity(Intent(requireContext(), PermissionActivity::class.java))
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+        return false
     }
 
     /** Scrolls the existing settings ScrollView to a section; no layout or values change. */
@@ -303,25 +411,29 @@ class SettingsFragment : Fragment() {
 
         binding.switchNoiseFilter.setOnCheckedChangeListener { _, isChecked ->
             preferences.isNoiseFilterEnabled = isChecked
-            val msg = if (isChecked) "Background Noise Filter Enabled" else "Background Noise Filter Disabled"
+            val msg = if (isChecked) "Noise filter ON • TV/shoor ignore hoga" else "Noise filter OFF • purana audio path"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
 
         binding.switchVoiceCallAnswering.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressTriggerUpdates) return@setOnCheckedChangeListener
+            if (!requireCallControlPermission(isChecked)) return@setOnCheckedChangeListener
             preferences.isVoiceCallAnsweringEnabled = isChecked
-            val msg = if (isChecked) "Voice Call Control Enabled (Pick/Cut)" else "Voice Call Control Disabled"
+            val msg = if (isChecked) "Call control ON • 'Pick karo' / 'Cut karo' chalega" else "Call control OFF"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
 
         binding.switchUnreadMessages.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressTriggerUpdates) return@setOnCheckedChangeListener
+            if (!requireNotificationAccess(isChecked)) return@setOnCheckedChangeListener
             preferences.isUnreadMessagesReaderEnabled = isChecked
-            val msg = if (isChecked) "Unread Messages Reader Enabled" else "Unread Messages Reader Disabled"
+            val msg = if (isChecked) "Unread reader ON • naye message padh ke sunayega" else "Unread reader OFF"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
 
         binding.switchShakeToTalk.setOnCheckedChangeListener { _, isChecked ->
             preferences.isShakeToTalkEnabled = isChecked
-            val msg = if (isChecked) "Shake-to-Talk Enabled" else "Shake-to-Talk Disabled"
+            val msg = if (isChecked) "Shake-to-talk ON • 2 baar hilao, baat shuru" else "Shake-to-talk OFF"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
 
